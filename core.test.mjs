@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seedData, questions, progress, finishReview, resubmit, completionErrors } from './core.js';
+import { seedData, questionGroups, questions, progress, finishReview, resubmit, completionErrors } from './core.js';
 
 function reviewedItem() {
   const item = seedData().find(i => i.status === 'work' && i.level === 2);
@@ -62,3 +62,17 @@ test('результат завершения сохраняет явный вы
   assert.equal(next.completedAt, '2026-11-27T14:00:00+05:00');
   assert.equal(item.status, 'work');
 });
+
+test('сохранённая карточка с отключённым направлением сохраняет остальные оценки', () => {
+  const item = seedData().find(i => i.status === 'work' && i.level === 2);
+  item.directions = ['procurement', 'budget'];
+  item.assessments = {
+    scope: { answer: 'yes' },
+    'proc-contract': { answer: 'issue', comment: 'Сохранённый черновик' }
+  };
+  const oldAnswers = structuredClone(item.assessments);
+  assert.deepEqual(questionGroups(item).map(group => group.id), ['common', 'budget']);
+  assert.deepEqual(progress(item), { total: 8, reviewed: 1, issues: 0 });
+  assert.deepEqual(item.assessments, oldAnswers);
+});
+
