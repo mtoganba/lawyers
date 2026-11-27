@@ -276,6 +276,7 @@ document.addEventListener('click', async event => {
   }
   switch (button.dataset.action) {
     case 'menu': document.querySelector('#sidebar').classList.toggle('open'); break;
+    case 'sidebar-collapse': { const sidebar = document.querySelector('#sidebar'); const collapsed = sidebar.classList.toggle('collapsed'); button.setAttribute('aria-expanded', String(!collapsed)); button.setAttribute('aria-label', collapsed ? 'Развернуть меню' : 'Свернуть меню'); button.querySelector('span').textContent = collapsed ? '›' : '‹'; break; }
     case 'home': state.version = 'current'; state.resultView = 'edit'; navigate('#/registry'); break;
     case 'templates': if (currentRoute().view === 'review') modalShell('О проверочных листах', '<p>Критерии помогают структурировать правовую оценку. Юрист выбирает применимые направления, проверяет документы и обосновывает замечания.</p><p>Предлагаемые вопросы требуют согласования с правовым подразделением. Их заполнение не заменяет профессиональную оценку юриста.</p>', '<button class="btn primary" data-action="close-modal">Понятно</button>'); else navigate('#/templates'); break;
     case 'close-modal': closeModal(); break;
@@ -391,7 +392,7 @@ document.addEventListener('change', async event => {
 });
 modal.addEventListener('click', event => { if (event.target === modal) { const r = modal.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) closeModal(); } });
 let lastReviewId = currentRoute().id;
-window.addEventListener('hashchange', () => { state.errors = []; state.resultView = 'edit'; if (currentRoute().id !== lastReviewId) state.version = 'current'; lastReviewId = currentRoute().id; render(); window.scrollTo({ top: 0 }); });
+window.addEventListener('hashchange', () => { state.errors = []; state.resultView = 'edit'; if (currentRoute().id !== lastReviewId) state.version = 'current'; lastReviewId = currentRoute().id; render(); main.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }); });
 window.addEventListener('pagehide', () => { if (saveTimeout) persist(); });
 render();
 

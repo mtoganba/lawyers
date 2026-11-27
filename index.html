@@ -3,30 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#052b43">
+  <meta name="theme-color" content="#022945">
   <meta name="description" content="Рабочее пространство юриста для юридической экспертизы аудиторских документов на основном и заключительном этапах.">
   <title>Юридическая экспертиза · SAQ</title>
-  <link rel="icon" type="image/svg+xml" href="./logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="./saq-favicon.png">
   <link rel="stylesheet" href="./styles.css?v=vga-1">
   <link rel="stylesheet" href="./workspace.css?v=vga-1">
+  <link rel="stylesheet" href="./evga-theme.css?v=evga-style-1">
 </head>
 <body>
   <a href="#main" class="skip-link">Перейти к содержимому</a>
   <aside class="sidebar" id="sidebar">
-    <a class="brand" href="#" aria-label="SAQ — реестр юридических экспертиз">
-      <img src="./logo.svg" alt="" width="43" height="43">
+    <div class="brand-row"><a class="brand" href="#" aria-label="SAQ — реестр юридических экспертиз">
+      <img src="./saq-logo.png" alt="" width="56" height="44">
       <span><strong>SAQ</strong><small>Система государственного аудита</small></span>
-    </a>
+    </a><button class="sidebar-toggle" data-action="sidebar-collapse" aria-label="Свернуть меню" aria-expanded="true" aria-controls="sidebar-navigation"><span aria-hidden="true">‹</span></button></div>
     <div class="sidebar-content">
       <p class="eyebrow">Модули системы</p>
-      <div class="module"><span class="module-symbol">ЮЭ</span><span>Правовое обеспечение</span></div>
-      <nav aria-label="Основная навигация">
-        <a class="nav-item active" href="#" data-nav="registry"><span data-icon="scale"></span><span>Юридическая экспертиза</span></a>
-        <button class="nav-item" data-action="templates"><span data-icon="checklist"></span><span>Проверочные листы</span></button>
-      </nav>
+      <section class="module-group"><div class="module"><span class="module-symbol">ЮЭ</span><span class="module-name">Правовое обеспечение</span><span class="module-chevron" aria-hidden="true">⌃</span></div>
+      <nav aria-label="Основная навигация" id="sidebar-navigation">
+        <a class="nav-item active" href="#" data-nav="registry" aria-label="Юридическая экспертиза" title="Юридическая экспертиза"><span data-icon="scale"></span><span>Юридическая экспертиза</span></a>
+        <button class="nav-item" data-action="templates" aria-label="Проверочные листы" title="Проверочные листы"><span data-icon="checklist"></span><span>Проверочные листы</span></button>
+      </nav></section>
       <div class="sidebar-note"><span data-icon="link"></span><div><strong>Документы из ВГА</strong><p>Комплекты основного и заключительного этапов</p></div></div>
     </div>
-    <button class="nav-item help-link" data-action="help"><span data-icon="help"></span><span>Как работать с экспертизой</span></button>
+    <button class="nav-item help-link" data-action="help" aria-label="Как работать с экспертизой" title="Как работать с экспертизой"><span data-icon="help"></span><span>Как работать с экспертизой</span></button>
   </aside>
   <div class="workspace">
     <header class="topbar">
@@ -37,7 +38,7 @@
         <span class="language">RU</span>
         <label class="actor-switch"><span>Демо</span><select id="actor-select" aria-label="Работать как — демонстрационная роль"></select></label>
         <div class="profile"><div><strong id="actor-name">Ермекова Алия Сериковна</strong><span id="actor-role">Юрист</span></div><span class="avatar" id="actor-avatar">АЕ</span></div>
-        <button class="btn top-home" data-action="home"><span data-icon="grid"></span>Главное меню</button>
+        <button class="btn top-home" data-action="home" title="Главное меню"><span data-icon="grid"></span><span class="header-action-label">Главное меню</span></button>
       </div>
     </header>
     <main id="main" tabindex="-1"></main>
@@ -45,7 +46,7 @@
   </div>
   <dialog id="modal" aria-labelledby="modal-title"><div id="modal-content"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="./app.js?v=vga-1"></script>
+  <script type="module" src="./app.js?v=evga-style-1"></script>
 </body>
 </html>
 
