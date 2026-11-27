@@ -1,4 +1,4 @@
-import { STAFF, STATUS, ANSWERS, DIRECTIONS, OUTCOMES, seedData, questionGroups, questions, progress, findings, assessmentErrors, completionErrors, finishReview, resubmit } from './core.js';
+import { STAFF, STATUS, ANSWERS, DIRECTIONS, OUTCOMES, seedData, questionGroups, questions, progress, findings, assessmentErrors, completionErrors, finishReview, resubmit } from './core.js?v=f7ab02b';
 
 const paths = {
   scale: '<path d="M12 3v17m-5 1h10M5 7h14M6 7l-4 8h8L6 7Zm12 0-4 8h8l-4-8Z"/>',
@@ -268,3 +268,4 @@ modal.addEventListener('click', event => { if (event.target === modal) { const r
 window.addEventListener('hashchange', () => { state.errors = []; render(); window.scrollTo({ top: 0 }); });
 window.addEventListener('pagehide', () => { if (saveTimeout) persist(); });
 render();
+
