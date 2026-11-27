@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Макет юридической экспертизы 2 и 3",
   "scripts": {
-    "test": "node --test core.test.mjs"
+    "test": "node --test *.test.mjs"
   }
 }
+

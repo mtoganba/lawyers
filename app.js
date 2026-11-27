@@ -1,4 +1,5 @@
 import { STAFF, STATUS, ANSWERS, DIRECTIONS, OUTCOMES, seedData, questionGroups, questions, progress, findings, assessmentErrors, completionErrors, finishReview, resubmit } from './core.js?v=f7ab02b';
+import { conclusionModel, conclusionPreviewHtml, conclusionWord, conclusionFilename } from './print-forms.js?v=word-1';
 
 const paths = {
   scale: '<path d="M12 3v17m-5 1h10M5 7h14M6 7l-4 8h8L6 7Zm12 0-4 8h8l-4-8Z"/>',
@@ -8,6 +9,8 @@ const paths = {
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   grid: '<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/>',
   search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
+  printer: '<path d="M6 9V3h12v6M6 17H3V9h18v8h-3M6 14h12v7H6V14Z"/><path d="M17 12h1"/>',
+  minus: '<path d="M5 12h14"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
@@ -35,7 +38,7 @@ const KEY = 'saq-lawyers-v1';
 let storageAvailable = true;
 let records;
 try { const value = JSON.parse(localStorage.getItem(KEY) || 'null'); records = Array.isArray(value) && value.every(r => r.id && r.documents && r.assessments && r.result && r.history && r.versions && r.directions) ? value : seedData(); } catch { records = seedData(); }
-const state = { tab: 'all', search: '', level: 'all', assignee: 'all', today: false, reviewGroup: 'common', errors: [], savedAt: '', previewDocument: null };
+const state = { resultView: 'edit', printZoom: 80, printGeneratedAt: null, tab: 'all', search: '', level: 'all', assignee: 'all', today: false, reviewGroup: 'common', errors: [], savedAt: '', previewDocument: null };
 const main = document.querySelector('main');
 const modal = document.querySelector('#modal');
 const toastNode = document.querySelector('#toast');
@@ -88,7 +91,7 @@ function renderDetail(item, selectedTab) {
   let notice = '';
   if (item.status === 'new') notice = `<div class="notice">${icon('info')}<div><strong>Новый комплект документов</strong>Назначьте исполнителя, чтобы приступить к юридической экспертизе.</div><div class="notice-actions"><button class="btn small soft" data-action="assign">Назначить исполнителя</button></div></div>`;
   if (item.status === 'rework') notice = `<div class="notice amber">${icon('clock')}<div><strong>Комплект находится на доработке</strong>Замечания сохранены. Следующий шаг — получить исправленные документы от аудитора.</div><div class="notice-actions"><button class="btn small" data-action="resubmit">Тест: получить исправления</button></div></div>`;
-  if (item.status === 'completed') notice = `<div class="notice green">${icon('check')}<div><strong>Юридическая экспертиза завершена</strong>${date(item.completedAt)} · ${esc(OUTCOMES[item.result.outcome])}. Результат сохранён в рабочем макете.</div><div class="notice-actions"><button class="btn small" data-action="export-result">${icon('download')}Скачать результат</button></div></div>`;
+  if (item.status === 'completed') notice = `<div class="notice green">${icon('check')}<div><strong>Юридическая экспертиза завершена</strong>${date(item.completedAt)} · ${esc(OUTCOMES[item.result.outcome])}. Результат сохранён в рабочем макете.</div><div class="notice-actions"><button class="btn small" data-action="export-result">${icon('download')}Скачать Word</button></div></div>`;
   main.innerHTML = `<div class="breadcrumb"><button data-action="home">Юридическая экспертиза</button>${icon('chevron')}<span>${item.id}</span></div>
   <div class="page-heading detail-heading"><div><h1>${esc(item.name)}</h1><div class="detail-number"><span>${item.id}</span><span>·</span><span>${levelName(item)}</span>${statusTag(item)}</div></div><div class="heading-actions"><button class="btn" data-action="versions">${icon('history')}Версии комплекта <span class="count">${item.iteration}</span></button><button class="btn" data-action="home">К реестру</button></div></div>
   <section class="surface detail-summary" aria-label="Сведения об экспертизе"><div class="summary-field"><span>Уровень экспертизы</span><strong>${levelName(item)}</strong><small>${stageName(item)}</small></div><div class="summary-field"><span>Аудиторское мероприятие</span><strong>${esc(item.event)}</strong><small>БИН ${item.bin}</small></div><div class="summary-field"><span>Исполнитель</span><strong>${esc(shortName(item.assigned))}</strong>${item.status !== 'completed' ? '<button class="text-link" data-action="assign">Изменить исполнителя</button>' : '<small>Правовое подразделение</small>'}</div><div class="summary-field"><span>Дата поступления</span><strong>${date(item.received)}</strong><small>Передача ${item.iteration}</small></div><div class="summary-field"><span>Срок экспертизы</span><strong>${date(item.due)}</strong><small>Тестовая дата</small></div></section>${notice}
@@ -117,13 +120,22 @@ function renderRemarks(item) {
   return `<div class="section-top"><div><h2>Замечания по документам</h2><p>Формируются из правовой оценки с привязкой к документу и его пункту</p></div>${list.length ? '<button class="btn small" data-action="export-remarks">' + icon('download') + 'Скачать замечания</button>' : ''}</div>${list.length ? `<div class="remarks-list">${list.map((f, index) => { const doc = item.documents.find(d => d.id === f.documentId); return `<article class="remark"><div class="remark-head"><div><h3>${index + 1}. ${esc(f.title)}</h3><div class="remark-source">${esc(doc?.title || 'Документ не выбран')} · ${f.point ? `пункт ${esc(f.point)}` : 'пункт не указан'}${doc ? ` · версия ${doc.version}` : ''}</div></div><span class="tag rework">Есть замечание</span></div><div class="remark-label">Замечание юриста</div><p>${esc(f.comment || 'Замечание ещё не заполнено')}</p><div class="remark-label">Норма НПА</div><p>${esc(f.npa || 'Не указана')}</p><div class="remark-label">Рекомендуемое исправление</div><p>${esc(f.recommendation || 'Не заполнено')}</p>${f.auditorReply ? `<div class="remark-reply"><strong>Ответ аудитора · демонстрация</strong><p>${esc(f.auditorReply)}</p></div>` : ''}${!isReadonly(item) ? `<button class="text-link" data-edit-criterion="${f.id}" style="margin-top:15px">${icon('edit')}Изменить в правовой оценке</button>` : ''}</article>`; }).join('')}</div>` : `<div class="empty-state"><div class="empty-symbol">${icon('checklist')}</div><h2>Замечания пока не зафиксированы</h2><p>При выборе «Есть замечания» в проверочном листе<br>здесь появится запись по соответствующему документу.</p><a class="btn" href="${reviewUrl(item, 'assessment')}">Открыть правовую оценку</a></div>`}
   ${list.length && !isReadonly(item) ? `<div class="assessment-footer"><span class="muted" style="font-size:13px">Перед передачей заполните все выбранные критерии.</span><button class="btn primary" data-action="return">Передать замечания на доработку</button></div>` : ''}`;
 }
+function renderResultToolbar(item) {
+  return `<div class="section-top result-section-top"><div><h2>Результат юридической экспертизы</h2><p>Общий вывод и печатная форма юридического заключения</p></div><div class="button-group"><button class="btn small" data-action="download-word">${icon('download')}Скачать Word</button><button class="btn small" data-action="print-word">${icon('printer')}Печать</button></div></div>
+  <div class="result-view-switch" role="tablist" aria-label="Форма результата экспертизы"><button class="tab ${state.resultView === 'edit' ? 'active' : ''}" role="tab" aria-selected="${state.resultView === 'edit'}" data-action="result-view" data-view="edit">Форма заключения</button><button class="tab ${state.resultView === 'print' ? 'active' : ''}" role="tab" aria-selected="${state.resultView === 'print'}" data-action="result-view" data-view="print">Электронная форма</button><span class="tag ${item.status === 'completed' ? 'completed' : ''}">${item.status === 'completed' ? 'Экспертиза завершена' : 'Проект заключения'}</span></div>`;
+}
+function renderWordPreview(item) {
+  const model = conclusionModel(item, state.printGeneratedAt || new Date().toISOString());
+  return `<div class="print-form-caption"><span class="tag">RU</span><span>Печатная форма по данным карточки · Word</span><span class="print-template-note">Рабочий шаблон</span></div><section class="word-viewer" aria-label="Просмотр печатной формы"><div class="word-viewer-toolbar"><div class="word-viewer-title">${icon('file')}<span>Юридическое заключение · ${esc(item.id)}</span></div><div class="word-viewer-controls"><button class="word-viewer-btn" data-action="print-zoom" data-step="-10" aria-label="Уменьшить масштаб" ${state.printZoom <= 50 ? 'disabled' : ''}>${icon('minus')}</button><span class="word-viewer-zoom">${state.printZoom}%</span><button class="word-viewer-btn" data-action="print-zoom" data-step="10" aria-label="Увеличить масштаб" ${state.printZoom >= 125 ? 'disabled' : ''}>${icon('plus')}</button><button class="word-viewer-btn" data-action="download-word" aria-label="Скачать заключение в Word">${icon('download')}</button><button class="word-viewer-btn" data-action="print-word" aria-label="Распечатать заключение">${icon('printer')}</button></div></div><iframe id="word-document-frame" class="word-document-frame" title="Печатная форма юридического заключения" sandbox="allow-same-origin allow-modals" srcdoc="${esc(conclusionPreviewHtml(model, state.printZoom))}"></iframe></section><div class="info-note">${icon('info')}<span>Просмотр и файл Word формируются из одних данных. Для изменения текста откройте «Форма заключения». Подписание в макете не выполняется.</span></div>`;
+}
 function renderResult(item) {
   const p = progress(item); const lock = disabled(item); const completed = item.status === 'completed';
-  return `<div class="section-top"><div><h2>Результат юридической экспертизы</h2><p>Общий вывод по переданному комплекту документов</p></div></div>${completed ? `<div class="completed-result"><span class="tag completed">Экспертиза завершена</span><h3>${esc(OUTCOMES[item.result.outcome])}</h3><p>${esc(item.result.text)}</p><span class="subtext">${esc(item.assigned)} · ${date(item.completedAt)}</span></div>` : ''}
+  if (state.resultView === 'print') return renderResultToolbar(item) + renderWordPreview(item);
+  return `${renderResultToolbar(item)}${completed ? `<div class="completed-result"><span class="tag completed">Экспертиза завершена</span><h3>${esc(OUTCOMES[item.result.outcome])}</h3><p>${esc(item.result.text)}</p><span class="subtext">${esc(item.assigned)} · ${date(item.completedAt)}</span></div>` : ''}
   <div class="result-layout"><div class="result-box">${!completed ? `<label class="field">Общий вывод <span class="required">*</span><select class="select" id="result-outcome" ${lock}><option value="">Выберите общий вывод</option>${Object.entries(OUTCOMES).map(([key, name]) => `<option value="${key}" ${item.result.outcome === key ? 'selected' : ''}>${name}</option>`).join('')}</select><small>Вывод определяет юрист по содержанию материалов и замечаний.</small></label><label class="field">Обоснование общего вывода <span class="required">*</span><textarea class="tall" id="result-text" placeholder="Опишите результат проверки, существенные замечания и рекомендации" ${lock}>${esc(item.result.text)}</textarea></label>` : ''}
   <div><label class="field" style="margin-bottom:9px">Приложения к результату</label>${!isReadonly(item) ? `<label class="upload-control" for="result-files">${icon('upload')}<span><strong>Прикрепить файл</strong><small>PDF, DOCX, XLSX, TXT, PNG, JPG · до 1 МБ на файл</small></span><input id="result-files" type="file" accept=".pdf,.docx,.xlsx,.txt,.png,.jpg,.jpeg" multiple hidden></label>` : ''}<div class="attachment-list">${(item.result.attachments || []).map((f, i) => `<div class="attachment">${icon('file')}<span>${esc(f.name)}<small class="subtext">${Math.ceil(f.size / 1024)} КБ</small></span><button class="text-link" data-download-attachment="${i}">Скачать</button>${!isReadonly(item) ? `<button class="icon-btn" data-remove-attachment="${i}" aria-label="Удалить приложение ${esc(f.name)}">${icon('close')}</button>` : ''}</div>`).join('') || '<span class="subtext">Приложений нет</span>'}</div></div>
-  <div class="info-note">${icon('info')}<span>Электронная запись результата. Согласованная печатная форма и подписание будут добавлены после определения требований.</span></div></div><aside class="result-sidebar"><h3>Состояние проверки</h3><div class="result-stat"><span>Критериев проверено</span><strong>${p.reviewed} / ${p.total}</strong></div><div class="result-stat"><span>Замечаний</span><strong>${p.issues}</strong></div><div class="result-stat"><span>Версия комплекта</span><strong>${item.iteration}</strong></div><p>Завершение доступно после рассмотрения всех критериев и заполнения общего вывода. Балльная оценка не применяется.</p></aside></div>
-  <div class="assessment-footer"><span class="save-state" data-save-state>${icon('check')}${completed ? 'Результат сохранён в макете' : 'Черновик сохраняется в этом браузере'}</span><div class="button-group">${completed ? '<button class="btn primary" data-action="export-result">' + icon('download') + 'Скачать результат</button>' : `<button class="btn" data-action="save" ${lock}>Сохранить черновик</button>${findings(item).length ? `<button class="btn" data-action="return" ${lock}>Передать на доработку</button>` : ''}<button class="btn primary" data-action="complete" ${lock}>Завершить экспертизу</button>`}</div></div>`;
+  <div class="info-note">${icon('info')}<span>Печатную форму можно просмотреть во вкладке «Электронная форма» и скачать в Word. Используется рабочий шаблон; подписание пока не выполняется.</span></div></div><aside class="result-sidebar"><h3>Состояние проверки</h3><div class="result-stat"><span>Критериев проверено</span><strong>${p.reviewed} / ${p.total}</strong></div><div class="result-stat"><span>Замечаний</span><strong>${p.issues}</strong></div><div class="result-stat"><span>Версия комплекта</span><strong>${item.iteration}</strong></div><p>Завершение доступно после рассмотрения всех критериев и заполнения общего вывода. Балльная оценка не применяется.</p></aside></div>
+  <div class="assessment-footer"><span class="save-state" data-save-state>${icon('check')}${completed ? 'Результат сохранён в макете' : 'Черновик сохраняется в этом браузере'}</span><div class="button-group">${completed ? '<button class="btn primary" data-action="export-result">' + icon('download') + 'Скачать Word</button>' : `<button class="btn" data-action="save" ${lock}>Сохранить черновик</button>${findings(item).length ? `<button class="btn" data-action="return" ${lock}>Передать на доработку</button>` : ''}<button class="btn primary" data-action="complete" ${lock}>Завершить экспертизу</button>`}</div></div>`;
 }
 function renderHistory(item) { return `<div class="section-top"><div><h2>История рассмотрения</h2><p>Поступление комплектов, назначения и результаты экспертизы</p></div></div><div class="timeline">${item.history.map(h => `<div class="timeline-item"><h3>${esc(h.action)}</h3><p>${esc(h.detail)}</p><small>${time(h.time)} · ${esc(h.author)}</small></div>`).join('')}</div>`; }
 function renderTemplates() {
@@ -150,6 +162,32 @@ function documentPreview(item, documentId, versionItem = null) {
     summary: '<h4>Сводные сведения</h4><p>Демонстрационный реестр обобщает обстоятельства и правовые выводы по материалам аудиторского мероприятия.</p><p>Каждая запись должна быть связана с соответствующим отчётом и подтверждающими материалами.</p>'
   };
   modalShell(doc.title, `<div class="doc-preview"><div class="preview-mark">Демонстрационный фрагмент · не официальный документ</div><h3>${esc(doc.title)}</h3><dl><dt>Объект аудита</dt><dd>${esc(item.name)}</dd><dt>Номер документа</dt><dd>${esc(doc.number)}</dd><dt>Дата / версия</dt><dd>${date(doc.date)} · версия ${doc.version}</dd></dl>${sample[doc.id] || '<p>Демонстрационный материал.</p>'}</div>`, `<button class="btn" data-action="close-modal">Закрыть</button><button class="btn primary" data-action="download-document">${icon('download')}Скачать фрагмент TXT</button>`, '850px');
+}
+async function downloadConclusionWord(item) {
+  const buttons = [...document.querySelectorAll('[data-action="download-word"],[data-action="export-result"]')];
+  buttons.forEach(button => { button.disabled = true; });
+  try {
+    state.printGeneratedAt = new Date().toISOString();
+    const model = conclusionModel(item, state.printGeneratedAt);
+    const blob = await conclusionWord(model);
+    download(conclusionFilename(model), blob, blob.type);
+    toast('Печатная форма Word сформирована');
+  } catch (error) { toast('Не удалось сформировать Word. Обновите страницу и повторите загрузку.'); }
+  finally { buttons.forEach(button => { button.disabled = false; }); }
+}
+async function printConclusion(item) {
+  try {
+    if (state.resultView !== 'print') {
+      state.resultView = 'print'; state.printGeneratedAt = new Date().toISOString(); render();
+    }
+    const frame = document.querySelector('#word-document-frame');
+    await new Promise((resolve, reject) => {
+      if (frame.contentDocument?.querySelector('.legal-document')) { resolve(); return; }
+      const timeout = setTimeout(() => reject(new Error('Print preview timeout')), 7000);
+      frame.addEventListener('load', () => { clearTimeout(timeout); resolve(); }, { once: true });
+    });
+    frame.contentWindow.focus(); frame.contentWindow.print();
+  } catch (error) { toast('Не удалось открыть печать. Скачайте форму Word и распечатайте её из редактора.'); }
 }
 function exportResult(item, remarksOnly = false) {
   const lines = ['SAQ · ДЕМОНСТРАЦИОННЫЕ ДАННЫЕ', remarksOnly ? 'Замечания по результатам правовой оценки' : 'Электронная запись результата юридической экспертизы', '', item.id, levelName(item), item.name, `БИН: ${item.bin}`, `Аудиторское мероприятие: ${item.event}`, `Исполнитель: ${item.assigned || 'не назначен'}`, `Передача комплекта: ${item.iteration}`, `Статус: ${STATUS[item.status]}`, '', 'ДОКУМЕНТЫ', ...item.documents.map(d => `${d.title} · ${d.number} · версия ${d.version}`), ''];
@@ -178,7 +216,7 @@ function openReturn(item) {
   modalShell('Передача замечаний на доработку', `<p>Для комплекта ${esc(item.id)} зафиксировано замечаний: <strong>${findings(item).length}</strong>.</p><label class="field">Сопроводительный комментарий<textarea id="return-comment" placeholder="Что необходимо учесть при доработке"></textarea></label><div class="notice">${icon('info')}<div>Тестовое действие: комплект перейдёт в статус «На доработке». Реальная отправка в ВГА не выполняется.</div></div>`, '<button class="btn" data-action="close-modal">Отмена</button><button class="btn primary" data-action="confirm-return">Передать на доработку</button>');
 }
 
-document.addEventListener('click', event => {
+document.addEventListener('click', async event => {
   const button = event.target.closest('button,[data-action]'); if (!button || button.disabled) return;
   const item = currentItem();
   if (button.dataset.tab) { state.tab = button.dataset.tab; render(); return; }
@@ -227,11 +265,15 @@ document.addEventListener('click', event => {
     case 'confirm-resubmit': { if (item?.status !== 'rework') return; records[records.findIndex(r => r.id === item.id)] = resubmit(item); state.reviewGroup = 'common'; persist(); closeModal(); render(); toast('Получена новая версия. Предыдущая оценка сохранена'); break; }
     case 'complete': if (item && !isReadonly(item)) openComplete(item); break;
     case 'confirm-complete': { if (!item || isReadonly(item)) return; try { records[records.findIndex(r => r.id === item.id)] = finishReview(item); persist(); closeModal(); render(); toast('Юридическая экспертиза завершена'); } catch (error) { closeModal(); showErrors(error.message.split('\n')); } break; }
-    case 'export-result': exportResult(item); break;
+    case 'result-view': state.resultView = button.dataset.view; state.printGeneratedAt = new Date().toISOString(); state.errors = []; render(); break;
+    case 'print-zoom': state.printZoom = Math.max(50, Math.min(125, state.printZoom + Number(button.dataset.step))); render(); break;
+    case 'download-word':
+    case 'export-result': await downloadConclusionWord(item); break;
+    case 'print-word': await printConclusion(item); break;
     case 'export-remarks': exportResult(item, true); break;
     case 'export-registry': { const quote = value => `"${String(value ?? '').replaceAll('"', '""')}"`; const lines = [['Номер экспертизы', 'Объект', 'БИН', 'Мероприятие', 'Уровень', 'Статус', 'Исполнитель', 'Срок'], ...records.filter(i => matches(i)).map(i => [i.id, i.name, i.bin, i.event, levelName(i), STATUS[i.status], i.assigned, date(i.due)])]; download('Реестр-юридических-экспертиз.csv', '\uFEFF' + lines.map(line => line.map(quote).join(';')).join('\r\n'), 'text/csv;charset=utf-8'); break; }
     case 'download-document': { const p = state.previewDocument; const doc = (p.versionItem || records.find(r => r.id === p.itemId)).documents.find(d => d.id === p.documentId); download(`${doc.title}-фрагмент.txt`, '\uFEFF' + document.querySelector('.doc-preview').innerText); break; }
-    case 'help': modalShell('Как работать с юридической экспертизой', '<div class="help-step"><strong>Получите комплект и назначьте исполнителя</strong><p>В реестре откройте новую экспертизу. В макете можно добавить тестовый комплект.</p></div><div class="help-step"><strong>Изучите документы и заполните правовую оценку</strong><p>Выберите направления проверки. По каждому критерию укажите ответ; замечания свяжите с документом и пунктом.</p></div><div class="help-step"><strong>При необходимости передайте замечания на доработку</strong><p>После тестового получения исправлений можно сравнить документы и прежнюю оценку в версиях.</p></div><div class="help-step"><strong>Оформите результат</strong><p>Заполните общий вывод и завершите экспертизу. Результат можно скачать как текстовую запись.</p></div><div class="info-note">' + icon('info') + 'Рабочий макет на демонстрационных данных. Подключение ВГА и подписание результата ещё не реализованы.</div>', '<button class="btn primary" data-action="close-modal">Понятно</button>'); break;
+    case 'help': modalShell('Как работать с юридической экспертизой', '<div class="help-step"><strong>Получите комплект и назначьте исполнителя</strong><p>В реестре откройте новую экспертизу. В макете можно добавить тестовый комплект.</p></div><div class="help-step"><strong>Изучите документы и заполните правовую оценку</strong><p>Выберите направления проверки. По каждому критерию укажите ответ; замечания свяжите с документом и пунктом.</p></div><div class="help-step"><strong>При необходимости передайте замечания на доработку</strong><p>После тестового получения исправлений можно сравнить документы и прежнюю оценку в версиях.</p></div><div class="help-step"><strong>Оформите результат</strong><p>Заполните общий вывод и завершите экспертизу. Во вкладке «Электронная форма» можно посмотреть заключение, скачать его в Word или распечатать.</p></div><div class="info-note">' + icon('info') + 'Рабочий макет на демонстрационных данных. Подключение ВГА и подписание результата ещё не реализованы.</div>', '<button class="btn primary" data-action="close-modal">Понятно</button>'); break;
   }
 });
 
