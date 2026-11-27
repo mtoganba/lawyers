@@ -1,4 +1,4 @@
-import { STATUS, ANSWERS, OUTCOMES, questionGroups, progress, findings } from './core.js?v=f7ab02b';
+import { STATUS, ANSWERS, OUTCOMES, questionGroups, progress, findings } from './core.js?v=vga-1';
 
 const clean = value => String(value ?? '').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '').replace(/\r\n?/g, '\n');
 const valueOr = (value, fallback = 'Не указано') => clean(value).trim() || fallback;

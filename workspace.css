@@ -1,0 +1,550 @@
+/* Компоновка реестра, объекта и заключения по образцу вкладки «Контроль качества» ВГА. */
+:root{--surface:#fff;--text:var(--ink);--blue:var(--navy);--line-soft:#e5eaf1;--blue-line:#cbdce9;--blue-soft:#eef5fb}
+main{padding:24px 25px 40px}.topbar{min-height:75px}.quality-registry{display:grid;gap:12px;min-width:0}.quality-registry-head{display:flex;justify-content:space-between;gap:15px;align-items:center}.quality-registry-head h1{font-weight:600}.registry-tools{display:flex;gap:18px;align-items:center}.registry-tools .text-link{font-size:12px}.quality-tabs>button{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}.quality-search input{border:1px solid #cfd9e5;color:var(--ink);background:#fff}.quality-search input::placeholder{color:#a6b2bf}.quality-objects-panel{overflow:hidden}.table-wrap{width:100%;overflow:auto}.table-wrap table{width:100%;border-collapse:collapse;text-align:left}.table-wrap th,.table-wrap td{border-bottom:1px solid var(--line-soft)}.table-wrap tr:last-child td{border-bottom:0}.quality-objects-table{min-width:930px;table-layout:fixed}.quality-objects-table th:nth-child(1){width:25%}.quality-objects-table th:nth-child(2){width:20%}.quality-objects-table th:nth-child(3){width:26%}.quality-objects-table th:nth-child(4){width:18%}.quality-objects-table th:nth-child(5){width:11%}.quality-objects-table small,.quality-step{display:block}.quality-objects-table td>strong{font-size:13px}.quality-object-link{text-decoration:none}.quality-empty-state{text-align:center}.quality-empty-state h2{font-size:17px;font-weight:600;margin:0 0 12px}.quality-empty-state p{color:var(--muted);font-size:14px;line-height:1.7;max-width:650px;margin:0 auto 21px}.quality-empty-state .btn{margin-bottom:0}.page-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 1px}.qc-object-head h1{font-weight:600}.qc-section-title{font-size:15px;font-weight:600;margin:6px 0 0}.qc-stage .qc-facts{grid-template-columns:repeat(4,minmax(0,1fr))}.qc-stage-head .btn{white-space:nowrap}.qc-form select{width:360px;max-width:100%;font-size:13px;min-height:34px}.qc-form textarea{min-height:65px}.stage-footnote{display:flex;justify-content:space-between;align-items:center;gap:16px;color:var(--muted);font-size:12px;line-height:1.6}.stage-footnote .text-link{font-size:12px}.workflow-note{font-size:12px;line-height:18px;background:#f2f6fa;border-radius:4px;color:#58718b}.tag.review{color:#65558d;border-color:#d7cde8;background:#f7f3fc}.quality-document-workspace{min-width:0}.conclusion-toolbar{display:flex;align-items:center;gap:8px 12px;padding:16px 12px;margin:12px 0 20px;flex-wrap:wrap}.document-view-tabs{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}.document-view-tabs button{border:0;border-radius:0;background:#fff;padding:8px 14px;color:var(--ink);font-size:13px;height:34px}.document-view-tabs button+button{border-left:1px solid var(--line)}.document-view-tabs button.active{background:var(--navy);color:white}.document-view-tabs button:disabled{color:#9ba8b5}.document-view-actions{display:flex;align-items:center;gap:8px}.conclusion-toolbar-end{display:flex;align-items:center;gap:8px;margin-left:auto}.conclusion-toolbar .version-select{width:225px;height:34px;font-size:12px;min-height:34px}.conclusion-title{display:flex;justify-content:space-between;align-items:center;margin:12px 0 20px;gap:18px}.conclusion-title h1{font-size:20px;font-weight:600;margin:0 0 5px}.conclusion-title p,.conclusion-title>span{font-size:13px;line-height:1.6;color:var(--muted)}.conclusion-layout{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:20px;align-items:start}.conclusion-main{min-width:0;display:grid;gap:16px}.document-panel{padding:20px;scroll-margin-top:20px}.document-panel .section-top{margin-bottom:20px}.document-panel .section-top h2{font-size:16px}.document-facts{display:grid;gap:0;margin:0}.document-facts>div{display:grid;grid-template-columns:230px minmax(0,1fr);gap:18px;padding:12px 0;border-bottom:1px solid var(--line-soft);font-size:14px;line-height:1.6}.document-facts>div:first-child{padding-top:0}.document-facts>div:last-child{border:0;padding-bottom:0}.document-facts dt{font-size:13px;color:var(--muted)}.document-facts dd{margin:0}.conclusion-sidebar{display:grid;gap:16px;position:sticky;top:20px}.conclusion-sidebar .surface{padding:18px}.conclusion-sidebar h3{font-size:15px;font-weight:600;margin-bottom:16px}.conclusion-sidebar dl{margin:0 0 15px}.conclusion-sidebar dt{font-size:12px;color:var(--muted);margin-top:14px}.conclusion-sidebar dd{font-size:13px;line-height:1.6;margin:5px 0 0;overflow-wrap:anywhere}.conclusion-sidebar .text-link{font-size:12px}.section-navigation a{display:block;padding:10px 0;font-size:13px;line-height:1.5;text-decoration:none;border-bottom:1px solid var(--line-soft);color:var(--muted)}.section-navigation a:hover{color:var(--navy)}.section-navigation a:last-child{border:0}.legal-check-group{margin:20px 0 25px}.legal-check-group>h3{font-size:14px;font-weight:600;margin-bottom:10px}.legal-check-group:last-child{margin-bottom:0}.document-save-bar{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;padding:15px 0}.document-save-bar .btn{font-size:13px}.actor-switch{display:flex;align-items:center;gap:8px;padding:5px 7px;border:1px dashed #e2b45a;border-radius:5px;min-width:0;background:#fffdf5}.actor-switch>span{font-size:11px;color:#8a641d;white-space:nowrap}.actor-switch select{width:210px;max-width:100%;background:#fff;border:1px solid #d5deea;border-radius:4px;font-size:12px;color:var(--ink);padding:8px 28px 8px 9px}.topbar-actions{gap:15px}.topbar-title{min-width:0}.qc-controlled-table table{min-width:850px}.qc-controlled-table td:last-child .btn{white-space:normal;font-size:12px}.qc-controlled-table .tag{white-space:normal}
+/* «Контроль качества» — в стиле реестра дел: компактная шапка, панель вкладок и поиска,
+   таблица с плотными строками. Состав таблицы не меняется. */
+.quality-registry:has(> .quality-filters) {
+  gap: 12px;
+}
+.quality-registry .quality-registry-head {
+  margin-bottom: 2px;
+}
+.quality-registry .quality-registry-head h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+}
+.quality-registry .quality-registry-head p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.quality-registry .quality-filters.surface {
+  margin: 0;
+  padding: 12px 16px;
+}
+.quality-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+.quality-registry .quality-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.quality-registry .quality-tabs > button {
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.quality-registry .quality-tabs > button + button {
+  border-left: 1px solid var(--line);
+}
+.quality-registry .quality-tabs > button:hover:not(.active) {
+  background: #f5f8fb;
+}
+.quality-registry .quality-tabs > button.active {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: #fff;
+  box-shadow: none;
+}
+.quality-registry .quality-tab-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #eef2f6;
+  color: #4e5969;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.quality-registry .quality-tabs > button.active .quality-tab-count {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.quality-search {
+  position: relative;
+  flex: 0 1 380px;
+  min-width: 240px;
+}
+.quality-search > svg {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  width: 15px;
+  height: 15px;
+  transform: translateY(-50%);
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+.quality-search > input {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px 0 32px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.quality-filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 13px;
+}
+.quality-filter-summary strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.quality-registry .quality-objects-panel {
+  padding: 0;
+  border-color: var(--line-soft);
+}
+.quality-registry .quality-objects-table thead th {
+  padding: 10px 14px;
+  background: #fafbfc;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.quality-registry .quality-objects-table tbody td {
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 18px;
+  vertical-align: top;
+}
+.quality-registry .quality-objects-table tbody tr:hover td {
+  background: #f7fafc;
+}
+.quality-registry .quality-object-link {
+  color: var(--text);
+  font-weight: 600;
+  line-height: 18px;
+}
+.quality-registry .quality-object-link:hover {
+  color: var(--blue);
+}
+.quality-registry .quality-objects-table small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.quality-registry .quality-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding: 0 8px;
+  border: 1px solid #d8dde6;
+  border-radius: 6px;
+  background: #f5f7fa;
+  color: #586575;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 22px;
+}
+.quality-registry .quality-state::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.quality-registry .quality-state.working {
+  border-color: var(--blue-line);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.quality-registry .quality-state.done {
+  border-color: #b7d9b1;
+  background: #f6fff4;
+  color: #28751c;
+}
+.quality-registry .quality-step {
+  font-size: 13px;
+  font-weight: 600;
+}
+.quality-registry .quality-objects-table td:last-child .btn {
+  min-height: 32px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+.quality-registry .quality-empty-state {
+  padding: 32px 16px 24px;
+}
+@media (max-width: 760px) {
+  .quality-search {
+    flex-basis: 100%;
+  }
+}
+
+/* Страница объекта в «Контроле качества»: карточка объекта и карточки этапов — в стиле
+   «Сведений о деле» и этапов на вкладке «Документы». */
+.qc-object,
+.qc-stage {
+  padding: 14px 20px 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 3px 10px rgba(2, 41, 69, 0.04);
+}
+.qc-object-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+.qc-object-head h1 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 26px;
+}
+.qc-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 24px;
+}
+.qc-fact {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+}
+.qc-fact > span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+.qc-fact > strong {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.qc-object .qc-fact-wide {
+  grid-column: span 1;
+}
+.qc-empty {
+  color: var(--muted);
+  font-weight: 400 !important;
+}
+.qc-link {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.qc-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.qc-section-title {
+  margin: 6px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.qc-stages {
+  display: grid;
+  gap: 12px;
+}
+.qc-stage {
+  display: grid;
+  gap: 12px;
+}
+.qc-stage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.qc-stage-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.qc-stage-number {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--blue-line);
+  border-radius: 50%;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+}
+.qc-stage-head > .btn {
+  min-height: 32px;
+  margin-left: auto;
+  padding: 0 12px;
+}
+.qc-stage > .workflow-note {
+  justify-self: start;
+  max-width: 100%;
+}
+.qc-stage .quality-assignment {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+.qc-sources > summary {
+  cursor: pointer;
+  color: var(--blue);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.qc-sources ul {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.qc-sources li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.qc-sources li > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.qc-form {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: #fafbfc;
+}
+.qc-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.qc-form-row .dropdown-select {
+  width: 360px;
+  max-width: 100%;
+}
+.qc-form .dropdown-select-trigger {
+  min-height: 32px;
+  height: 32px;
+  font-size: 12px;
+}
+.qc-form .btn {
+  min-height: 32px;
+  padding: 0 12px;
+}
+.qc-form .field {
+  margin: 0;
+}
+.qc-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@media (max-width: 900px) {
+  .qc-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Подсказка этапа КК — в строке заголовка, сразу за статусом. */
+.qc-stage-head > .workflow-note {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 10px;
+  line-height: 18px;
+}
+
+/* Заключение КК: вкладки «Форма заключения / Документы на контроле» — переключатель
+   в начале панели действий, как вкладки на странице «Контроль качества». */
+@media screen {
+  .conclusion-toolbar > .document-view-tabs {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .conclusion-toolbar > .document-view-tabs > button {
+    height: 32px;
+    margin: 0;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: none;
+  }
+  .conclusion-toolbar > .document-view-tabs > button + button {
+    border-left: 1px solid var(--line);
+  }
+  .conclusion-toolbar > .document-view-tabs > button.active {
+    background: var(--blue);
+    color: #fff;
+  }
+  .conclusion-toolbar > .document-view-tabs > button:disabled:not(.active) {
+    color: #a3acb8;
+  }
+  .quality-document-workspace > .quality-document-links {
+    justify-content: space-between;
+    margin: 0 0 12px;
+  }
+  .quality-document-workspace > .quality-document-links .btn {
+    min-height: 32px;
+    padding: 0 12px;
+  }
+}
+
+/* «Документы на контроле» — карточка со списком документов этапа. */
+.qc-controlled {
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 3px 10px rgba(2, 41, 69, 0.04);
+  overflow: hidden;
+}
+.qc-controlled-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.qc-controlled-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.qc-controlled-head p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.qc-controlled-count {
+  color: var(--muted);
+  font-size: 13px;
+}
+.qc-controlled-count strong {
+  color: var(--text);
+}
+.qc-controlled-table {
+  border: 0;
+  border-radius: 0;
+}
+.qc-controlled-table table {
+  min-width: 760px;
+}
+.qc-controlled-table thead th {
+  padding: 10px 14px;
+  background: #fafbfc;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.qc-controlled-table tbody td {
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 18px;
+  vertical-align: middle;
+}
+.qc-controlled-table tbody tr:hover td {
+  background: #f7fafc;
+}
+.qc-controlled-table td strong {
+  display: block;
+  font-weight: 600;
+}
+.qc-controlled-table td small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.qc-controlled-table td:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+.qc-controlled-table td:last-child .btn {
+  min-height: 32px;
+  padding: 0 12px;
+}
+.qc-changed {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  border: 1px solid #edcba5;
+  border-radius: 5px;
+  background: #fffaf0;
+  color: #a14d0a;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.qc-controlled-empty {
+  margin: 0;
+  padding: 24px 20px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+
+@media(max-width:1450px){.demo-label{display:none}.actor-switch>span{display:none}.actor-switch select{width:230px}.quality-objects-table{min-width:900px}.qc-stage-head .workflow-note{flex-basis:auto}}
+@media(max-width:1180px){.qc-stage .qc-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.conclusion-layout{grid-template-columns:minmax(0,1fr) 220px}.conclusion-toolbar-end{margin-left:0}.document-facts>div{grid-template-columns:190px minmax(0,1fr)}.actor-switch select{width:200px}.registry-tools{gap:10px}.registry-tools .text-link{display:none}}
+@media(max-width:1000px){.conclusion-layout{grid-template-columns:minmax(0,1fr)}.conclusion-sidebar{position:static;grid-row:1;grid-template-columns:1fr 1fr}.conclusion-sidebar dl{display:grid;grid-template-columns:90px 1fr;gap:7px}.conclusion-sidebar dt{margin:0}.conclusion-sidebar dd{margin:0}.section-navigation{display:none}.conclusion-sidebar .surface{grid-column:1/-1}.topbar-actions{gap:8px}.topbar-title>span{max-width:250px}.actor-switch select{width:185px}}
+@media(max-width:800px){main{padding:22px 16px 35px}.quality-registry-head{align-items:flex-start;flex-wrap:wrap}.quality-registry-head h1{font-size:19px}.registry-tools{margin-left:auto}.quality-filter-row{gap:14px}.quality-tabs{max-width:100%;overflow-x:auto;flex-wrap:nowrap!important}.quality-registry .quality-tabs>button{padding:0 10px;font-size:12px}.quality-filter-summary{font-size:12px}.qc-object,.qc-stage{padding:14px 16px}.qc-object-head{flex-wrap:wrap}.qc-stage .qc-facts{grid-template-columns:1fr}.qc-form select{width:100%}.qc-form-row{align-items:stretch}.qc-form-row .btn{width:100%}.stage-footnote{flex-wrap:wrap}.conclusion-toolbar{padding:12px;margin-bottom:16px}.document-view-tabs{max-width:100%}.document-view-tabs button{font-size:12px;padding:8px 10px}.conclusion-toolbar-end{flex-wrap:wrap}.conclusion-title{align-items:flex-start;flex-wrap:wrap}.conclusion-title h1{font-size:19px}.conclusion-title>span{display:none}.document-panel{padding:17px 14px}.document-facts>div{grid-template-columns:1fr;gap:3px;padding:12px 0}.actor-switch{padding:3px;max-width:140px;border:none;background:transparent}.actor-switch select{width:135px;padding:7px;font-size:11px}.topbar-title>strong{font-size:16px}.topbar-title>span{display:none}.topbar .profile{display:none}.topbar{gap:8px;padding:0 12px}.document-save-bar .button-group{justify-content:flex-start}.quality-search{min-width:0}.qc-stage-head>.btn{margin-left:0}.document-panel .section-top .btn{font-size:12px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+
+/* На рабочем экране последняя колонка целиком вмещает действие. */
+.quality-objects-table th:nth-child(1){width:25%}.quality-objects-table th:nth-child(2){width:20%}.quality-objects-table th:nth-child(3){width:24%}.quality-objects-table th:nth-child(4){width:17%}.quality-objects-table th:nth-child(5){width:14%}
+.quality-registry .quality-objects-table td:last-child .btn{font-size:12px;padding:0 10px;min-height:32px}
+.actor-switch>span{display:inline!important}.actor-switch{flex-shrink:0}
+@media(max-width:800px){.actor-switch{max-width:155px}.actor-switch select{width:115px}.actor-switch>span{font-size:10px}}
+
+.quality-registry .quality-object-link{display:inline-block;max-width:100%;overflow-wrap:anywhere}

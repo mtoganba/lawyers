@@ -1,5 +1,7 @@
-import { STAFF, STATUS, ANSWERS, DIRECTIONS, OUTCOMES, seedData, questionGroups, questions, progress, findings, assessmentErrors, completionErrors, finishReview, resubmit } from './core.js?v=f7ab02b';
-import { conclusionModel, conclusionPreviewHtml, conclusionWord, conclusionFilename } from './print-forms.js?v=word-1';
+import { STAFF, STATUS, ANSWERS, DIRECTIONS, OUTCOMES, seedData, questionGroups, questions, progress, findings, assessmentErrors, completionErrors, finishReview, resubmit } from './core.js?v=vga-1';
+import { conclusionModel, conclusionPreviewHtml, conclusionWord, conclusionFilename } from './print-forms.js?v=vga-1';
+
+import { ACTORS, DEFAULT_HEAD, QUEUE_TABS, headOf, hasConclusion, objectCases, stageStep, queueRows, inQueueTab, searchQueue, newPacket, assignExpert, createConclusion, submitConclusion } from './workflow.js?v=vga-1';
 
 const paths = {
   scale: '<path d="M12 3v17m-5 1h10M5 7h14M6 7l-4 8h8L6 7Zm12 0-4 8h8l-4-8Z"/>',
@@ -38,7 +40,7 @@ const KEY = 'saq-lawyers-v1';
 let storageAvailable = true;
 let records;
 try { const value = JSON.parse(localStorage.getItem(KEY) || 'null'); records = Array.isArray(value) && value.every(r => r.id && r.documents && r.assessments && r.result && r.history && r.versions && r.directions) ? value : seedData(); } catch { records = seedData(); }
-const state = { resultView: 'edit', printZoom: 80, printGeneratedAt: null, tab: 'all', search: '', level: 'all', assignee: 'all', today: false, reviewGroup: 'common', errors: [], savedAt: '', previewDocument: null };
+const state = { resultView: 'edit', printZoom: 80, printGeneratedAt: null, tab: 'mine', actor: STAFF[0], version: 'current', search: '', level: 'all', assignee: 'all', today: false, reviewGroup: 'common', errors: [], savedAt: '', previewDocument: null };
 const main = document.querySelector('main');
 const modal = document.querySelector('#modal');
 const toastNode = document.querySelector('#toast');
@@ -51,12 +53,12 @@ function persist(show = false) {
   catch { storageAvailable = false; toast('Не удалось сохранить данные в браузере. Скачайте результат перед закрытием страницы.'); }
   document.querySelectorAll('[data-save-state]').forEach(el => { el.innerHTML = `${icon(storageAvailable ? 'check' : 'alert')}${storageAvailable ? 'Сохранено в этом браузере' : 'Изменения пока не сохранены'}`; });
 }
-function addHistory(item, action, detail, author = 'Ермекова Алия Сериковна') { item.history.unshift({ time: new Date().toISOString(), action, detail, author }); }
+function addHistory(item, action, detail, author = state.actor) { item.history.unshift({ time: new Date().toISOString(), action, detail, author }); }
 function currentRoute() { const parts = location.hash.replace(/^#\/?/, '').split('/').map(p => { try { return decodeURIComponent(p); } catch { return ''; } }); return { view: parts[0] || 'registry', id: parts[1], tab: parts[2] || 'documents' }; }
 function currentItem() { return records.find(item => item.id === currentRoute().id); }
 function navigate(hash) { state.errors = []; if (location.hash === hash) render(); else location.hash = hash; document.querySelector('#sidebar').classList.remove('open'); }
-function reviewUrl(item, tab = 'documents') { return `#/review/${encodeURIComponent(item.id)}/${tab}`; }
-function isReadonly(item) { return item.status === 'completed' || item.status === 'rework' || !item.assigned; }
+function reviewUrl(item, tab = 'form') { return `#/review/${encodeURIComponent(item.id)}/${tab}`; }
+function isReadonly(item) { return state.version !== 'current' || item.status !== 'work' || item.assigned !== state.actor || !hasConclusion(item); }
 function disabled(item) { return isReadonly(item) ? 'disabled' : ''; }
 function statusTag(item) { return `<span class="tag ${item.status}">${STATUS[item.status]}</span>`; }
 function errorBox() { return state.errors.length ? `<div class="error-box" role="alert" tabindex="-1"><strong>Проверьте заполнение</strong><ul>${state.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul></div>` : ''; }
@@ -64,52 +66,70 @@ function showErrors(errors) { state.errors = errors; render(); requestAnimationF
 function modalShell(title, body, footer = '', size = '') { modal.style.width = size; document.querySelector('#modal-content').innerHTML = `<div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="icon-btn" data-action="close-modal" aria-label="Закрыть">${icon('close')}</button></div><div class="modal-body">${body}</div>${footer ? `<div class="modal-footer">${footer}</div>` : ''}`; if (!modal.open) modal.showModal(); }
 function closeModal() { modal.close(); }
 function download(filename, content, type = 'text/plain;charset=utf-8') { const url = URL.createObjectURL(new Blob([content], { type })); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
-function matches(item, ignoreTab = false) {
-  const text = `${item.name} ${item.bin} ${item.event} ${item.id}`.toLocaleLowerCase('ru');
-  return (ignoreTab || state.tab === 'all' || item.status === state.tab) && (!state.search || text.includes(state.search.toLocaleLowerCase('ru').trim())) && (state.level === 'all' || item.level === Number(state.level)) && (state.assignee === 'all' || (state.assignee === 'mine' ? item.assigned === STAFF[0] : !item.assigned)) && (!state.today || (item.due <= new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Oral' }) && item.status !== 'completed'));
+function objectUrl(object) { return `#/object/${encodeURIComponent(object.id)}`; }
+function objectFor(item) { return objectCases(records).find(object => object.key === `${item.bin}|${item.event}`); }
+function replaceRecord(item) { records[records.findIndex(record => record.id === item.id)] = item; }
+function viewItem(item) {
+  const snapshot = state.version === 'current' ? null : item.versions[Number(state.version)];
+  return snapshot ? { ...item, ...snapshot, status: snapshot.status || 'rework', iteration: snapshot.number } : item;
 }
-function nextStep(item) {
-  if (item.status === 'new') return ['Назначить исполнителя', 'Комплект готов к рассмотрению'];
-  if (item.status === 'rework') return ['Ожидается исправленный комплект', `${findings(item).length} замечание · ответ аудитора`];
-  if (item.status === 'completed') return [OUTCOMES[item.result.outcome], `Завершена ${date(item.completedAt)}`];
-  const p = progress(item); return [p.reviewed === p.total ? 'Оформить результат экспертизы' : 'Провести правовую оценку', `Проверено ${p.reviewed} из ${p.total} критериев`];
+function matches(item) {
+  const row = queueRows(records, state.actor).find(row => row.key === `${item.bin}|${item.event}`);
+  return row && inQueueTab(row, state.tab) && searchQueue(row, state.search);
 }
+function stateBadge(step) { return `<span class="quality-state ${step.tone}">${esc(step.state)}</span>`; }
 function renderRegistry() {
-  const tabs = [['new', 'Новые'], ['work', 'В работе'], ['rework', 'На доработке'], ['completed', 'Завершённые'], ['all', 'Все экспертизы']];
-  const visible = records.filter(item => matches(item));
-  const filtered = state.search || state.level !== 'all' || state.assignee !== 'all' || state.today;
-  main.innerHTML = `<div class="page-heading"><div><h1>Юридическая экспертиза</h1><p>Аудиторские документы, правовая оценка и результаты рассмотрения</p></div><div class="heading-actions"><button class="btn" data-action="export-registry">${icon('download')}Выгрузить реестр</button><button class="btn primary" data-action="sample">${icon('plus')}Тестовый комплект</button></div></div>
-  <section class="surface filter-panel" aria-label="Поиск и фильтры"><div class="filter-top"><div class="tabs" role="tablist" aria-label="Статус экспертизы">${tabs.map(([id, title]) => `<button class="tab ${state.tab === id ? 'active' : ''}" role="tab" aria-selected="${state.tab === id}" data-tab="${id}">${title}<span class="count">${records.filter(i => matches(i, true) && (id === 'all' || i.status === id)).length}</span></button>`).join('')}</div><label class="search-box">${icon('search')}<input id="registry-search" aria-label="Поиск по наименованию, БИН или номеру" placeholder="Наименование, БИН или номер мероприятия" value="${esc(state.search)}" autocomplete="off"></label></div>
-  <div class="filter-bottom"><div class="filters"><select class="select" id="level-filter" aria-label="Уровень юридической экспертизы"><option value="all">Все уровни экспертизы</option><option value="2" ${state.level === '2' ? 'selected' : ''}>Юридическая экспертиза 2</option><option value="3" ${state.level === '3' ? 'selected' : ''}>Юридическая экспертиза 3</option></select><select class="select" id="assignee-filter" aria-label="Исполнитель"><option value="all">Все исполнители</option><option value="mine" ${state.assignee === 'mine' ? 'selected' : ''}>Назначено мне</option><option value="unassigned" ${state.assignee === 'unassigned' ? 'selected' : ''}>Без исполнителя</option></select><label class="filter-check"><input type="checkbox" id="due-filter" ${state.today ? 'checked' : ''}>Срок сегодня и ранее</label>${filtered ? '<button class="text-link" data-action="reset-filters">Сбросить</button>' : ''}</div><span class="found" aria-live="polite">Найдено: <strong>${visible.length}</strong></span></div></section>
-  <section class="surface" aria-label="Реестр экспертиз">${visible.length ? `<div class="registry-scroll"><table class="registry"><thead><tr><th scope="col">Объект аудита</th><th scope="col">Экспертиза</th><th scope="col">Статус и следующий шаг</th><th scope="col">Исполнитель</th><th scope="col">Срок</th><th scope="col">Действие</th></tr></thead><tbody>${visible.map(item => { const [step, sub] = nextStep(item); return `<tr><td><button class="object-link" data-open="${item.id}">${esc(item.name)}</button><span class="subtext">${esc(item.event)} · БИН ${item.bin}</span></td><td><div class="level-name">${levelName(item)}</div><span class="subtext">${stageName(item)}</span><span class="subtext">${item.id}</span></td><td>${statusTag(item)}<span class="next-action">${esc(step)}</span><span class="subtext">${esc(sub)}</span></td><td class="row-responsible">${esc(shortName(item.assigned))}${!item.assigned ? '<span class="subtext">Требуется назначение</span>' : '<span class="subtext">Правовое подразделение</span>'}</td><td class="row-deadline">${date(item.due)}<span class="subtext">Поступил ${date(item.received)}</span></td><td><button class="btn small" data-open="${item.id}">Открыть</button></td></tr>`; }).join('')}</tbody></table></div><div class="table-caption"><span>Показано ${visible.length} из ${records.length} экспертиз</span><span>Источник: демонстрационные комплекты ВГА</span></div>` : `<div class="empty-state"><div class="empty-symbol">${icon('inbox')}</div><h2>${filtered ? 'По вашему запросу ничего не найдено' : 'Здесь пока нет экспертиз'}</h2><p>${filtered ? 'Попробуйте изменить запрос или параметры поиска.' : 'После передачи комплекта документов он появится в этой вкладке.'}</p><button class="btn" data-action="reset-filters">Показать все экспертизы</button></div>`}</section>`;
+  const rows = queueRows(records, state.actor);
+  const current = QUEUE_TABS[state.tab] || QUEUE_TABS.mine;
+  const visible = rows.filter(row => inQueueTab(row, state.tab) && searchQueue(row, state.search));
+  main.innerHTML = `<div class="quality-registry"><div class="quality-registry-head"><div><h1>Юридическая экспертиза</h1><p>Что требует действия и кто продолжает работу</p></div><div class="registry-tools"><button class="text-link" data-action="export-registry">${icon('download')}Выгрузить реестр</button><button class="btn small" data-action="sample">${icon('plus')}Тестовый комплект</button></div></div>
+  <section class="surface quality-filters" aria-label="Поиск и фильтры"><div class="quality-filter-row"><div class="quality-tabs" role="tablist" aria-label="Объекты юридической экспертизы">${Object.entries(QUEUE_TABS).map(([key, tab]) => `<button role="tab" aria-selected="${state.tab === key}" class="${state.tab === key ? 'active' : ''}" data-tab="${key}">${tab.title}<span class="quality-tab-count">${rows.filter(row => inQueueTab(row, key)).length}</span></button>`).join('')}</div><label class="quality-search">${icon('search')}<input id="registry-search" aria-label="Поиск объекта" placeholder="Наименование, БИН или номер мероприятия" value="${esc(state.search)}" autocomplete="off"></label></div><div class="quality-filter-summary"><span>${current.description}</span><span role="status" aria-live="polite">Найдено: <strong>${visible.length}</strong></span></div></section>
+  <section class="surface quality-objects-panel" aria-label="Реестр объектов юридической экспертизы">${visible.length ? `<div class="table-wrap"><table class="quality-objects-table"><thead><tr><th>Объект аудита</th><th>Этап</th><th>Следующий шаг</th><th>Ответственный</th><th>Действие</th></tr></thead><tbody>${visible.map(row => `<tr><td><a class="quality-object-link" href="${objectUrl(row)}">${esc(row.name)}</a><small>${esc(row.event)} · БИН ${esc(row.bin)}</small></td><td><strong>Юридическая экспертиза ${row.level}</strong><small>${row.level === 2 ? 'Основной этап' : 'Заключительный этап'}</small></td><td>${stateBadge(row)}<strong class="quality-step">${esc(row.step)}</strong>${row.detail ? `<small>${esc(row.detail)}</small>` : ''}</td><td>${esc(row.responsible)}</td><td><a class="btn small" href="${objectUrl(row)}">Открыть объект</a></td></tr>`).join('')}</tbody></table></div>` : `<div class="quality-empty-state"><h2>${state.search.trim() ? 'Объекты не найдены' : current.emptyTitle}</h2><p>${state.search.trim() ? 'Измените условия поиска.' : current.emptyText}</p>${state.tab !== 'all' ? '<button class="btn" data-action="show-all">Показать все объекты</button>' : ''}</div>`}</section></div>`;
 }
-
-function renderDetail(item, selectedTab) {
-  const detailTabs = [['documents', 'Документы'], ['assessment', 'Правовая оценка'], ['remarks', 'Замечания'], ['result', 'Результат экспертизы'], ['history', 'История']];
-  const tab = detailTabs.some(([key]) => key === selectedTab) ? selectedTab : 'documents';
-  const p = progress(item);
-  let notice = '';
-  if (item.status === 'new') notice = `<div class="notice">${icon('info')}<div><strong>Новый комплект документов</strong>Назначьте исполнителя, чтобы приступить к юридической экспертизе.</div><div class="notice-actions"><button class="btn small soft" data-action="assign">Назначить исполнителя</button></div></div>`;
-  if (item.status === 'rework') notice = `<div class="notice amber">${icon('clock')}<div><strong>Комплект находится на доработке</strong>Замечания сохранены. Следующий шаг — получить исправленные документы от аудитора.</div><div class="notice-actions"><button class="btn small" data-action="resubmit">Тест: получить исправления</button></div></div>`;
-  if (item.status === 'completed') notice = `<div class="notice green">${icon('check')}<div><strong>Юридическая экспертиза завершена</strong>${date(item.completedAt)} · ${esc(OUTCOMES[item.result.outcome])}. Результат сохранён в рабочем макете.</div><div class="notice-actions"><button class="btn small" data-action="export-result">${icon('download')}Скачать Word</button></div></div>`;
-  main.innerHTML = `<div class="breadcrumb"><button data-action="home">Юридическая экспертиза</button>${icon('chevron')}<span>${item.id}</span></div>
-  <div class="page-heading detail-heading"><div><h1>${esc(item.name)}</h1><div class="detail-number"><span>${item.id}</span><span>·</span><span>${levelName(item)}</span>${statusTag(item)}</div></div><div class="heading-actions"><button class="btn" data-action="versions">${icon('history')}Версии комплекта <span class="count">${item.iteration}</span></button><button class="btn" data-action="home">К реестру</button></div></div>
-  <section class="surface detail-summary" aria-label="Сведения об экспертизе"><div class="summary-field"><span>Уровень экспертизы</span><strong>${levelName(item)}</strong><small>${stageName(item)}</small></div><div class="summary-field"><span>Аудиторское мероприятие</span><strong>${esc(item.event)}</strong><small>БИН ${item.bin}</small></div><div class="summary-field"><span>Исполнитель</span><strong>${esc(shortName(item.assigned))}</strong>${item.status !== 'completed' ? '<button class="text-link" data-action="assign">Изменить исполнителя</button>' : '<small>Правовое подразделение</small>'}</div><div class="summary-field"><span>Дата поступления</span><strong>${date(item.received)}</strong><small>Передача ${item.iteration}</small></div><div class="summary-field"><span>Срок экспертизы</span><strong>${date(item.due)}</strong><small>Тестовая дата</small></div></section>${notice}
-  <section class="surface"><nav class="detail-tabs" aria-label="Разделы карточки">${detailTabs.map(([key, text]) => `<a class="detail-tab ${key === tab ? 'active' : ''}" href="${reviewUrl(item, key)}" ${key === tab ? 'aria-current="page"' : ''}>${text}${key === 'remarks' ? `<span class="count">${findings(item).length}</span>` : key === 'assessment' ? `<span class="count">${p.reviewed}/${p.total}</span>` : ''}</a>`).join('')}</nav><div class="tab-content">${errorBox()}${tab === 'documents' ? renderDocuments(item) : tab === 'assessment' ? renderAssessment(item) : tab === 'remarks' ? renderRemarks(item) : tab === 'result' ? renderResult(item) : renderHistory(item)}</div></section>`;
+function stagePanel(object, level) {
+  const item = object.stages[level];
+  const step = stageStep(item, level, state.actor);
+  const editableAssignment = item && state.actor === headOf(item) && ['new', 'work'].includes(item.status);
+  let action = '';
+  if (item && hasConclusion(item)) action = `<a class="btn small" href="${reviewUrl(item)}">Открыть заключение</a>`;
+  else if (item?.assigned === state.actor && item.status === 'work') action = `<button class="btn small primary" data-action="create-conclusion" data-item="${item.id}">Создать заключение</button>`;
+  return `<section class="qc-stage" aria-label="Юридическая экспертиза ${level}"><header class="qc-stage-head"><span class="qc-stage-number">${level}</span><h3>${level === 2 ? 'Основной этап' : 'Заключительный этап'}</h3><span class="tag ${item?.status || ''}">${item ? esc(STATUS[item.status]) : 'Материалы не поступили'}</span><p class="workflow-note neutral">${esc(item ? step.step : step.detail)}</p>${action}</header><div class="quality-assignment"><div class="qc-facts">${item ? `<div class="qc-fact"><span>Дело юридической экспертизы</span><strong>№ ${esc(item.id)}</strong></div>` : ''}<div class="qc-fact"><span>Руководитель юридической экспертизы</span><strong>${esc(headOf(item))}</strong>${item && state.actor === headOf(item) && !['completed', 'review'].includes(item.status) ? `<button class="qc-link" data-action="change-head" data-item="${item.id}">Изменить</button>` : ''}</div><div class="qc-fact"><span>Ответственный юрист</span><strong class="${item?.assigned ? '' : 'qc-empty'}">${esc(item?.assigned || 'Не назначен')}</strong></div><div class="qc-fact"><span>Документы этапа</span>${item ? `<details class="qc-sources"><summary>${item.documents.length} документа</summary><ul>${item.documents.map(doc => `<li><button class="qc-link" data-document="${doc.id}" data-item="${item.id}">${esc(doc.title)}</button><span>v${doc.version}</span></li>`).join('')}</ul></details>` : '<strong class="qc-empty">Пока нет</strong>'}</div></div>
+  ${editableAssignment ? `<form class="qc-form" data-assignment="${item.id}"><div class="qc-form-row"><select class="select" name="expert" aria-label="${item.assigned ? 'Новый юрист' : 'Юрист'} — юридическая экспертиза ${level}"><option value="">${item.assigned ? 'Новый юрист' : 'Юрист'}: не выбран</option>${STAFF.filter(name => name !== item.assigned).map(name => `<option value="${esc(name)}">${esc(name)}</option>`).join('')}</select><button class="btn small ${item.assigned ? '' : 'primary'}" type="submit" disabled>${item.assigned ? 'Заменить юриста' : 'Назначить юриста'}</button></div>${item.assigned ? '<label class="field">Причина замены юриста <span class="required">*</span><textarea name="reason" rows="2" placeholder="Укажите причину замены"></textarea></label>' : ''}</form>` : ''}
+  ${item?.status === 'rework' ? `<div class="stage-footnote"><span>Замечания переданы аудитору. Предыдущие версии сохраняются.</span><button class="btn small" data-action="resubmit" data-item="${item.id}">Тест: получить исправления</button></div>` : ''}
+  ${!item ? `<div class="stage-footnote"><span>${level === 2 && object.stages[3] ? 'Сведения о юридической экспертизе 2 в макете отсутствуют.' : 'Комплект появится после передачи документов из ВГА.'}</span><button class="text-link" data-action="receive-stage" data-level="${level}" data-object="${object.id}">Тестовая передача документов</button></div>` : ''}</div></section>`;
+}
+function renderObject(object) {
+  main.innerHTML = `<div class="quality-registry object-workspace"><div class="page-toolbar"><button class="btn small" data-action="home">Все объекты</button><button class="btn small" data-action="object-history" data-object="${object.id}">${icon('history')}История рассмотрения</button></div><section class="qc-object"><div class="qc-object-head"><h1>${esc(object.name)}</h1><span class="tag">${object.stages[3]?.status === 'completed' ? 'Рассмотрение завершено' : 'Аудиторское мероприятие'}</span></div><div class="qc-facts"><div class="qc-fact"><span>Регистрационный номер</span><strong>${esc(object.event)}</strong></div><div class="qc-fact"><span>БИН</span><strong>${esc(object.bin)}</strong></div><div class="qc-fact qc-fact-wide"><span>Цель (предмет) аудита</span><strong>${esc(object.purpose || 'Не указана в демонстрационном комплекте')}</strong></div></div></section><h2 class="qc-section-title">Заключения юридической экспертизы</h2><div class="qc-stages">${[2, 3].map(level => stagePanel(object, level)).join('')}</div></div>`;
 }
 function renderDocuments(item) {
-  return `<div class="section-top"><div><h2>Комплект документов</h2><p>Документы ${stageName(item).toLocaleLowerCase('ru') === 'основной этап' ? 'основного' : 'заключительного'} этапа, переданные для юридической экспертизы</p></div><span class="tag">Передача ${item.iteration} · ${item.documents.length} документа</span></div>
-  <div class="document-table"><div class="document-row head"><span>Документ</span><span>Номер</span><span>Дата</span><span>Версия</span><span>Действие</span></div>${item.documents.map(d => `<div class="document-row"><div class="doc-title"><span class="doc-symbol">${icon('file')}</span><div><strong>${esc(d.title)}</strong><span class="subtext">${esc(d.kind)}</span></div></div><span>${esc(d.number)}</span><span>${date(d.date)}</span><span class="tag">Версия ${d.version}</span><button class="btn small" data-document="${d.id}">Просмотреть</button></div>`).join('')}</div>
-  <div class="info-note">${icon('info')}<span>В макете доступны демонстрационные фрагменты документов. Проверяется конкретная переданная версия; при повторной передаче предыдущий комплект сохраняется.</span></div>
-  <div class="assessment-footer"><span class="muted" style="font-size:13px">${esc(shortName(item.auditor))} · аудитор</span><a class="btn primary" href="${reviewUrl(item, 'assessment')}">${isReadonly(item) ? 'Открыть правовую оценку' : 'Перейти к правовой оценке'}</a></div>`;
+  const original = records.find(record => record.id === item.id);
+  return `<section class="qc-controlled"><header class="qc-controlled-head"><div><h2>Документы на экспертизе</h2><p>${stageName(item)}: документы, которые входят в переданный комплект.</p></div><span class="qc-controlled-count">Документов: <strong>${item.documents.length}</strong></span></header><div class="table-wrap qc-controlled-table"><table><thead><tr><th>Документ</th><th>Версия на экспертизе</th><th>Текущая версия</th><th>Статус</th><th>Действие</th></tr></thead><tbody>${item.documents.map(doc => { const latest = original.documents.find(entry => entry.id === doc.id); return `<tr><td><strong>${esc(doc.title)}</strong><small>${esc(doc.number)}</small></td><td>v${doc.version}${latest?.version > doc.version ? '<span class="qc-changed">есть новая версия</span>' : ''}</td><td>v${latest?.version || doc.version}</td><td><span class="tag">${item.status === 'completed' ? 'Рассмотрен' : 'Передан на экспертизу'}</span></td><td><button class="btn small" data-document="${doc.id}">Открыть версию на экспертизе</button></td></tr>`; }).join('')}</tbody></table></div><p class="qc-controlled-empty">В макете доступны демонстрационные фрагменты. Просмотр привязан к выбранной передаче комплекта.</p></section>`;
 }
 function renderAssessment(item) {
-  const groups = questionGroups(item); if (!groups.some(g => g.id === state.reviewGroup)) state.reviewGroup = 'common';
-  const group = groups.find(g => g.id === state.reviewGroup); const p = progress(item);
-  return `<div class="review-header"><div><div class="progress-title">Проверено <strong>${p.reviewed} из ${p.total}</strong> критериев</div><div class="progress-track"><span style="width:${p.reviewed / p.total * 100}%"></span></div><div class="review-summary"><span>Общая правовая оценка и выбранные направления</span><span class="issue-count">Замечаний: ${p.issues}</span></div></div><div class="button-group"><button class="btn small" data-action="directions" ${disabled(item)}>Направления проверки</button><button class="btn small" data-action="save" ${disabled(item)}>${icon('save')}Сохранить черновик</button></div></div>
-  <div class="review-layout"><aside class="review-outline" aria-label="Направления правовой оценки"><p class="eyebrow">Проверочные листы</p>${groups.map(g => `<button class="outline-item ${g.id === group.id ? 'active' : ''}" data-group="${g.id}">${icon(g.id === 'common' ? 'scale' : 'checklist')}<span>${g.title}</span><small>${g.questions.filter(q => item.assessments[q.id]?.answer && item.assessments[q.id].answer !== 'pending').length}/${g.questions.length}</small></button>`).join('')}<button class="btn small" data-action="templates">${icon('info')}О критериях проверки</button></aside>
-  <div class="check-group"><h3>${group.title}</h3><p class="group-description">Пример рабочего проверочного листа. Оценка и выводы заполняются юристом по материалам комплекта.</p>${group.questions.map(q => renderCriterion(item, q)).join('')}</div></div>
-  <div class="assessment-footer"><span class="save-state" data-save-state>${icon('check')}${storageAvailable ? 'Черновик сохраняется в этом браузере' : 'Сохранение недоступно'}</span><div class="button-group"><a class="btn" href="${reviewUrl(item, 'remarks')}">Посмотреть замечания</a><a class="btn primary" href="${reviewUrl(item, 'result')}">Перейти к результату</a></div></div>`;
+  const groups = questionGroups(item); const p = progress(item);
+  return `<div class="section-top"><div><h2>Правовая оценка</h2><p>Проверено ${p.reviewed} из ${p.total} критериев · замечаний: ${p.issues}</p></div><button class="btn small" data-action="directions" ${disabled(item)}>Направления проверки</button></div>${groups.map(group => `<section class="legal-check-group"><h3>${group.title}</h3>${group.questions.map(question => renderCriterion(item, question)).join('')}</section>`).join('')}<div class="info-note">${icon('info')}Дополнительные направления выбирает юрист по материалам дела. Критерии — рабочие примеры.</div>`;
+}
+function conclusionActions(item) {
+  if (state.version !== 'current') return '<span class="subtext">Предыдущая передача · только просмотр</span>';
+  if (item.status === 'review' && state.actor === headOf(item)) return `<button class="btn small" data-action="review-return">Вернуть юристу</button><button class="btn small primary" data-action="complete">Завершить экспертизу</button>`;
+  if (!isReadonly(item)) return `<button class="btn small" data-action="save">${icon('save')}Сохранить черновик</button><button class="btn small primary" data-action="submit-review">Направить на рассмотрение</button>`;
+  return '';
+}
+function renderConclusionForm(item) {
+  const canEdit = !isReadonly(item);
+  return `<div class="conclusion-layout"><div class="conclusion-main"><section class="surface document-panel" id="legal-general"><div class="section-top"><h2>Общая информация</h2></div><div class="qc-facts"><div class="qc-fact"><span>Уровень экспертизы</span><strong>${levelName(item)}</strong></div><div class="qc-fact"><span>Дата поступления полного комплекта</span><strong>${date(item.received)}</strong></div><div class="qc-fact"><span>Ответственный юрист</span><strong>${esc(item.assigned || 'Не назначен')}</strong></div></div></section>
+  <section class="surface document-panel" id="legal-audit"><div class="section-top"><h2>Сведения об аудиторском мероприятии</h2></div><dl class="document-facts"><div><dt>Объект государственного аудита</dt><dd>${esc(item.name)}</dd></div><div><dt>БИН</dt><dd>${esc(item.bin)}</dd></div><div><dt>Регистрационный номер</dt><dd>${esc(item.event)}</dd></div><div><dt>Цель (предмет) аудита</dt><dd>${esc(item.purpose || 'Не указана в демонстрационном комплекте')}</dd></div><div><dt>Этап</dt><dd>${stageName(item)}</dd></div><div><dt>Аудитор</dt><dd>${esc(item.auditor)}</dd></div></dl></section>
+  <section class="surface document-panel" id="legal-assessment">${renderAssessment(item)}</section><section class="surface document-panel" id="legal-remarks">${renderRemarks(item)}</section><section class="surface document-panel" id="legal-result">${renderResult(item)}</section><div class="document-save-bar"><span class="save-state" data-save-state>${icon('check')}${canEdit ? 'Черновик сохраняется в этом браузере' : 'Доступен просмотр заключения'}</span><div class="button-group">${conclusionActions(item)}</div></div></div>
+  <aside class="conclusion-sidebar"><section class="surface"><h3>Сведения о заключении</h3><dl><dt>Дело</dt><dd>${esc(item.id)}</dd><dt>Состояние</dt><dd>${statusTag(item)}</dd><dt>Передача комплекта</dt><dd>${item.iteration}</dd><dt>Руководитель</dt><dd>${esc(headOf(item))}</dd></dl><button class="text-link" data-action="document-history">${icon('history')}История заключения</button></section><nav class="surface section-navigation" aria-label="Разделы заключения"><h3>Разделы</h3>${[['legal-general','Общая информация'],['legal-audit','Сведения об аудите'],['legal-assessment','Правовая оценка'],['legal-remarks','Замечания к документам'],['legal-result','Выводы и рекомендации']].map(([id, title]) => `<a href="#${id}" data-scroll="${id}">${title}</a>`).join('')}</nav></aside></div>`;
+}
+function renderDetail(original, selectedTab) {
+  const object = objectFor(original); const item = viewItem(original);
+  const requested = ['sources', 'documents'].includes(selectedTab) ? 'sources' : selectedTab === 'print' ? 'print' : 'form';
+  const tab = state.resultView === 'print' ? 'print' : requested;
+  if (!hasConclusion(original) && tab !== 'sources') { renderObject(object); return; }
+  const has = hasConclusion(original);
+  main.innerHTML = `<div class="quality-document-workspace"><div class="page-toolbar"><a class="btn small" href="${objectUrl(object)}">К объекту юридической экспертизы</a><button class="btn small" data-action="versions">${icon('history')}Версии комплекта</button></div><section class="surface conclusion-toolbar"><nav class="document-view-tabs" aria-label="Представление заключения"><button class="${tab === 'form' ? 'active' : ''}" aria-pressed="${tab === 'form'}" data-action="conclusion-view" data-view="form" ${!has ? 'disabled' : ''}>Форма заключения</button><button class="${tab === 'sources' ? 'active' : ''}" aria-pressed="${tab === 'sources'}" data-action="conclusion-view" data-view="sources">Документы на экспертизе</button></nav><div class="document-view-actions">${has ? `<button class="btn small ${tab === 'print' ? 'soft' : ''}" data-action="conclusion-view" data-view="print">Электронная форма</button><button class="btn small" data-action="print-word">Печать</button>` : ''}${statusTag(item)}</div><div class="conclusion-toolbar-end">${has ? `<button class="btn small" data-action="download-word">${icon('download')}Word</button>` : ''}<select class="select version-select" id="conclusion-version" aria-label="Передача комплекта"><option value="current">Передача ${original.iteration} · текущая</option>${original.versions.map((version, index) => `<option value="${index}" ${String(state.version) === String(index) ? 'selected' : ''}>Передача ${version.number} · ${date(version.time)}</option>`).join('')}</select></div></section>
+  <div class="conclusion-title"><div><h1>Юридическое заключение</h1><p>${levelName(item)} · ${stageName(item).toLocaleLowerCase('ru')} · ${esc(item.id)}</p></div><span>${esc(shortName(item.assigned))}</span></div>${errorBox()}${original.status === 'review' ? `<div class="notice"><div><strong>Заключение на рассмотрении</strong>${esc(headOf(original))}${original.reviewComment ? `<p>${esc(original.reviewComment)}</p>` : ''}</div><div class="notice-actions">${conclusionActions(original)}</div></div>` : ''}${original.reviewComment && original.status === 'work' ? `<div class="notice amber"><div><strong>Замечания руководителя</strong>${esc(original.reviewComment)}</div></div>` : ''}${original.status === 'rework' ? `<div class="notice amber"><div><strong>Ожидается исправленный комплект</strong>Документы и замечания доступны для просмотра.</div><button class="btn small" data-action="resubmit">Тест: получить исправления</button></div>` : ''}${tab === 'print' ? renderWordPreview(item) : tab === 'sources' ? renderDocuments(item) : renderConclusionForm(item)}</div>`;
 }
 function renderCriterion(item, q) {
   const a = item.assessments[q.id] || { answer: 'pending' }; const uid = q.id; const lock = disabled(item);
@@ -117,25 +137,15 @@ function renderCriterion(item, q) {
 }
 function renderRemarks(item) {
   const list = findings(item);
-  return `<div class="section-top"><div><h2>Замечания по документам</h2><p>Формируются из правовой оценки с привязкой к документу и его пункту</p></div>${list.length ? '<button class="btn small" data-action="export-remarks">' + icon('download') + 'Скачать замечания</button>' : ''}</div>${list.length ? `<div class="remarks-list">${list.map((f, index) => { const doc = item.documents.find(d => d.id === f.documentId); return `<article class="remark"><div class="remark-head"><div><h3>${index + 1}. ${esc(f.title)}</h3><div class="remark-source">${esc(doc?.title || 'Документ не выбран')} · ${f.point ? `пункт ${esc(f.point)}` : 'пункт не указан'}${doc ? ` · версия ${doc.version}` : ''}</div></div><span class="tag rework">Есть замечание</span></div><div class="remark-label">Замечание юриста</div><p>${esc(f.comment || 'Замечание ещё не заполнено')}</p><div class="remark-label">Норма НПА</div><p>${esc(f.npa || 'Не указана')}</p><div class="remark-label">Рекомендуемое исправление</div><p>${esc(f.recommendation || 'Не заполнено')}</p>${f.auditorReply ? `<div class="remark-reply"><strong>Ответ аудитора · демонстрация</strong><p>${esc(f.auditorReply)}</p></div>` : ''}${!isReadonly(item) ? `<button class="text-link" data-edit-criterion="${f.id}" style="margin-top:15px">${icon('edit')}Изменить в правовой оценке</button>` : ''}</article>`; }).join('')}</div>` : `<div class="empty-state"><div class="empty-symbol">${icon('checklist')}</div><h2>Замечания пока не зафиксированы</h2><p>При выборе «Есть замечания» в проверочном листе<br>здесь появится запись по соответствующему документу.</p><a class="btn" href="${reviewUrl(item, 'assessment')}">Открыть правовую оценку</a></div>`}
+  return `<div class="section-top"><div><h2>Замечания по документам</h2><p>Формируются из правовой оценки с привязкой к документу и его пункту</p></div>${list.length ? '<button class="btn small" data-action="export-remarks">' + icon('download') + 'Скачать замечания</button>' : ''}</div>${list.length ? `<div class="remarks-list">${list.map((f, index) => { const doc = item.documents.find(d => d.id === f.documentId); return `<article class="remark"><div class="remark-head"><div><h3>${index + 1}. ${esc(f.title)}</h3><div class="remark-source">${esc(doc?.title || 'Документ не выбран')} · ${f.point ? `пункт ${esc(f.point)}` : 'пункт не указан'}${doc ? ` · версия ${doc.version}` : ''}</div></div><span class="tag rework">Есть замечание</span></div><div class="remark-label">Замечание юриста</div><p>${esc(f.comment || 'Замечание ещё не заполнено')}</p><div class="remark-label">Норма НПА</div><p>${esc(f.npa || 'Не указана')}</p><div class="remark-label">Рекомендуемое исправление</div><p>${esc(f.recommendation || 'Не заполнено')}</p>${f.auditorReply ? `<div class="remark-reply"><strong>Ответ аудитора · демонстрация</strong><p>${esc(f.auditorReply)}</p></div>` : ''}${!isReadonly(item) ? `<button class="text-link" data-edit-criterion="${f.id}" style="margin-top:15px">${icon('edit')}Изменить в правовой оценке</button>` : ''}</article>`; }).join('')}</div>` : `<div class="empty-state"><div class="empty-symbol">${icon('checklist')}</div><h2>Замечания пока не зафиксированы</h2><p>При выборе «Есть замечания» в проверочном листе<br>здесь появится запись по соответствующему документу.</p><a class="btn" href="${reviewUrl(item, 'form')}">Открыть правовую оценку</a></div>`}
   ${list.length && !isReadonly(item) ? `<div class="assessment-footer"><span class="muted" style="font-size:13px">Перед передачей заполните все выбранные критерии.</span><button class="btn primary" data-action="return">Передать замечания на доработку</button></div>` : ''}`;
-}
-function renderResultToolbar(item) {
-  return `<div class="section-top result-section-top"><div><h2>Результат юридической экспертизы</h2><p>Общий вывод и печатная форма юридического заключения</p></div><div class="button-group"><button class="btn small" data-action="download-word">${icon('download')}Скачать Word</button><button class="btn small" data-action="print-word">${icon('printer')}Печать</button></div></div>
-  <div class="result-view-switch" role="tablist" aria-label="Форма результата экспертизы"><button class="tab ${state.resultView === 'edit' ? 'active' : ''}" role="tab" aria-selected="${state.resultView === 'edit'}" data-action="result-view" data-view="edit">Форма заключения</button><button class="tab ${state.resultView === 'print' ? 'active' : ''}" role="tab" aria-selected="${state.resultView === 'print'}" data-action="result-view" data-view="print">Электронная форма</button><span class="tag ${item.status === 'completed' ? 'completed' : ''}">${item.status === 'completed' ? 'Экспертиза завершена' : 'Проект заключения'}</span></div>`;
 }
 function renderWordPreview(item) {
   const model = conclusionModel(item, state.printGeneratedAt || new Date().toISOString());
   return `<div class="print-form-caption"><span class="tag">RU</span><span>Печатная форма по данным карточки · Word</span><span class="print-template-note">Рабочий шаблон</span></div><section class="word-viewer" aria-label="Просмотр печатной формы"><div class="word-viewer-toolbar"><div class="word-viewer-title">${icon('file')}<span>Юридическое заключение · ${esc(item.id)}</span></div><div class="word-viewer-controls"><button class="word-viewer-btn" data-action="print-zoom" data-step="-10" aria-label="Уменьшить масштаб" ${state.printZoom <= 50 ? 'disabled' : ''}>${icon('minus')}</button><span class="word-viewer-zoom">${state.printZoom}%</span><button class="word-viewer-btn" data-action="print-zoom" data-step="10" aria-label="Увеличить масштаб" ${state.printZoom >= 125 ? 'disabled' : ''}>${icon('plus')}</button><button class="word-viewer-btn" data-action="download-word" aria-label="Скачать заключение в Word">${icon('download')}</button><button class="word-viewer-btn" data-action="print-word" aria-label="Распечатать заключение">${icon('printer')}</button></div></div><iframe id="word-document-frame" class="word-document-frame" title="Печатная форма юридического заключения" sandbox="allow-same-origin allow-modals" srcdoc="${esc(conclusionPreviewHtml(model, state.printZoom))}"></iframe></section><div class="info-note">${icon('info')}<span>Просмотр и файл Word формируются из одних данных. Для изменения текста откройте «Форма заключения». Подписание в макете не выполняется.</span></div>`;
 }
 function renderResult(item) {
-  const p = progress(item); const lock = disabled(item); const completed = item.status === 'completed';
-  if (state.resultView === 'print') return renderResultToolbar(item) + renderWordPreview(item);
-  return `${renderResultToolbar(item)}${completed ? `<div class="completed-result"><span class="tag completed">Экспертиза завершена</span><h3>${esc(OUTCOMES[item.result.outcome])}</h3><p>${esc(item.result.text)}</p><span class="subtext">${esc(item.assigned)} · ${date(item.completedAt)}</span></div>` : ''}
-  <div class="result-layout"><div class="result-box">${!completed ? `<label class="field">Общий вывод <span class="required">*</span><select class="select" id="result-outcome" ${lock}><option value="">Выберите общий вывод</option>${Object.entries(OUTCOMES).map(([key, name]) => `<option value="${key}" ${item.result.outcome === key ? 'selected' : ''}>${name}</option>`).join('')}</select><small>Вывод определяет юрист по содержанию материалов и замечаний.</small></label><label class="field">Обоснование общего вывода <span class="required">*</span><textarea class="tall" id="result-text" placeholder="Опишите результат проверки, существенные замечания и рекомендации" ${lock}>${esc(item.result.text)}</textarea></label>` : ''}
-  <div><label class="field" style="margin-bottom:9px">Приложения к результату</label>${!isReadonly(item) ? `<label class="upload-control" for="result-files">${icon('upload')}<span><strong>Прикрепить файл</strong><small>PDF, DOCX, XLSX, TXT, PNG, JPG · до 1 МБ на файл</small></span><input id="result-files" type="file" accept=".pdf,.docx,.xlsx,.txt,.png,.jpg,.jpeg" multiple hidden></label>` : ''}<div class="attachment-list">${(item.result.attachments || []).map((f, i) => `<div class="attachment">${icon('file')}<span>${esc(f.name)}<small class="subtext">${Math.ceil(f.size / 1024)} КБ</small></span><button class="text-link" data-download-attachment="${i}">Скачать</button>${!isReadonly(item) ? `<button class="icon-btn" data-remove-attachment="${i}" aria-label="Удалить приложение ${esc(f.name)}">${icon('close')}</button>` : ''}</div>`).join('') || '<span class="subtext">Приложений нет</span>'}</div></div>
-  <div class="info-note">${icon('info')}<span>Печатную форму можно просмотреть во вкладке «Электронная форма» и скачать в Word. Используется рабочий шаблон; подписание пока не выполняется.</span></div></div><aside class="result-sidebar"><h3>Состояние проверки</h3><div class="result-stat"><span>Критериев проверено</span><strong>${p.reviewed} / ${p.total}</strong></div><div class="result-stat"><span>Замечаний</span><strong>${p.issues}</strong></div><div class="result-stat"><span>Версия комплекта</span><strong>${item.iteration}</strong></div><p>Завершение доступно после рассмотрения всех критериев и заполнения общего вывода. Балльная оценка не применяется.</p></aside></div>
-  <div class="assessment-footer"><span class="save-state" data-save-state>${icon('check')}${completed ? 'Результат сохранён в макете' : 'Черновик сохраняется в этом браузере'}</span><div class="button-group">${completed ? '<button class="btn primary" data-action="export-result">' + icon('download') + 'Скачать Word</button>' : `<button class="btn" data-action="save" ${lock}>Сохранить черновик</button>${findings(item).length ? `<button class="btn" data-action="return" ${lock}>Передать на доработку</button>` : ''}<button class="btn primary" data-action="complete" ${lock}>Завершить экспертизу</button>`}</div></div>`;
+  return `<div class="section-top"><div><h2>Выводы и рекомендации</h2><p>Результат юридической экспертизы включается в печатную форму заключения</p></div><button class="btn small" data-action="conclusion-view" data-view="print">Электронная форма</button></div><div class="result-box"><label class="field">Общий вывод <span class="required">*</span><select class="select" id="result-outcome" ${disabled(item)}><option value="">Выберите общий вывод</option>${Object.entries(OUTCOMES).map(([value, title]) => `<option value="${value}" ${item.result.outcome === value ? 'selected' : ''}>${title}</option>`).join('')}</select></label><label class="field">Обоснование общего вывода <span class="required">*</span><textarea id="result-text" class="tall" placeholder="Опишите результат проверки, существенные замечания и рекомендации" ${disabled(item)}>${esc(item.result.text)}</textarea></label><div><label class="field">Приложения к результату</label>${!isReadonly(item) ? `<label class="upload-control" for="result-files">${icon('upload')}<span><strong>Прикрепить файл</strong><small>PDF, DOCX, XLSX, TXT, PNG, JPG · до 1 МБ на файл</small></span><input id="result-files" type="file" accept=".pdf,.docx,.xlsx,.txt,.png,.jpg,.jpeg" multiple hidden></label>` : ''}<div class="attachment-list">${(item.result.attachments || []).map((file, index) => `<div class="attachment">${icon('file')}<span>${esc(file.name)}<small class="subtext">${Math.ceil(file.size / 1024)} КБ</small></span><button class="text-link" data-download-attachment="${index}">Скачать</button>${!isReadonly(item) ? `<button class="icon-btn" data-remove-attachment="${index}" aria-label="Удалить приложение ${esc(file.name)}">${icon('close')}</button>` : ''}</div>`).join('') || '<span class="subtext">Приложений нет</span>'}</div></div></div>`;
 }
 function renderHistory(item) { return `<div class="section-top"><div><h2>История рассмотрения</h2><p>Поступление комплектов, назначения и результаты экспертизы</p></div></div><div class="timeline">${item.history.map(h => `<div class="timeline-item"><h3>${esc(h.action)}</h3><p>${esc(h.detail)}</p><small>${time(h.time)} · ${esc(h.author)}</small></div>`).join('')}</div>`; }
 function renderTemplates() {
@@ -146,12 +156,14 @@ function render() {
   const route = currentRoute();
   document.querySelectorAll('[data-nav]').forEach(el => el.classList.toggle('active', route.view !== 'templates'));
   if (route.view === 'review') { const item = records.find(i => i.id === route.id); if (item) renderDetail(item, route.tab); else main.innerHTML = '<div class="surface empty-state"><h1>Карточка не найдена</h1><p>Вернитесь в реестр и выберите экспертизу.</p><button class="btn" data-action="home">К реестру</button></div>'; }
+  else if (route.view === 'object') { const object = objectCases(records).find(object => object.id === route.id || Object.values(object.stages).some(item => item.id === route.id)); if (object) renderObject(object); else main.innerHTML = '<div class="surface empty-state"><h1>Объект не найден</h1><button class="btn" data-action="home">К реестру</button></div>'; }
   else if (route.view === 'templates') renderTemplates(); else renderRegistry();
+  renderActor();
   document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon); });
 }
 
 function documentPreview(item, documentId, versionItem = null) {
-  const source = versionItem || item; const doc = source.documents.find(d => d.id === documentId); if (!doc) return;
+  const source = versionItem || viewItem(item); const doc = source.documents.find(d => d.id === documentId); if (!doc) return;
   state.previewDocument = { itemId: item.id, documentId, versionItem };
   const sample = {
     report: '<h4>4. Результаты рассмотрения вопроса программы аудита</h4><p>В ходе изучения материалов рассмотрено документальное обоснование исполнения договора. В реестре отражены обстоятельства, требующие проверки правильности применения законодательства.</p><h4>5. Подтверждающие материалы</h4><p>Договор, документы об исполнении обязательств и пояснения ответственных лиц приведены в составе аудиторских доказательств.</p>',
@@ -164,6 +176,7 @@ function documentPreview(item, documentId, versionItem = null) {
   modalShell(doc.title, `<div class="doc-preview"><div class="preview-mark">Демонстрационный фрагмент · не официальный документ</div><h3>${esc(doc.title)}</h3><dl><dt>Объект аудита</dt><dd>${esc(item.name)}</dd><dt>Номер документа</dt><dd>${esc(doc.number)}</dd><dt>Дата / версия</dt><dd>${date(doc.date)} · версия ${doc.version}</dd></dl>${sample[doc.id] || '<p>Демонстрационный материал.</p>'}</div>`, `<button class="btn" data-action="close-modal">Закрыть</button><button class="btn primary" data-action="download-document">${icon('download')}Скачать фрагмент TXT</button>`, '850px');
 }
 async function downloadConclusionWord(item) {
+  item = viewItem(item);
   const buttons = [...document.querySelectorAll('[data-action="download-word"],[data-action="export-result"]')];
   buttons.forEach(button => { button.disabled = true; });
   try {
@@ -216,14 +229,37 @@ function openReturn(item) {
   modalShell('Передача замечаний на доработку', `<p>Для комплекта ${esc(item.id)} зафиксировано замечаний: <strong>${findings(item).length}</strong>.</p><label class="field">Сопроводительный комментарий<textarea id="return-comment" placeholder="Что необходимо учесть при доработке"></textarea></label><div class="notice">${icon('info')}<div>Тестовое действие: комплект перейдёт в статус «На доработке». Реальная отправка в ВГА не выполняется.</div></div>`, '<button class="btn" data-action="close-modal">Отмена</button><button class="btn primary" data-action="confirm-return">Передать на доработку</button>');
 }
 
+
+function renderActor() {
+  const select = document.querySelector('#actor-select');
+  select.innerHTML = ACTORS.map(actor => `<option value="${esc(actor.name)}" ${state.actor === actor.name ? 'selected' : ''}>${esc(actor.name)}${records.some(item => headOf(item) === actor.name) ? ' · руководитель' : ' · юрист'}</option>`).join('');
+  document.querySelector('#actor-name').textContent = state.actor;
+  const heads = records.some(item => headOf(item) === state.actor);
+  document.querySelector('#actor-role').textContent = heads ? 'Руководитель правового подразделения' : 'Юрист';
+  document.querySelector('#actor-avatar').textContent = state.actor.split(' ').slice(0,2).map(part => part[0]).join('');
+}
+function updateAssignment(form) {
+  const item = records.find(record => record.id === form.dataset.assignment);
+  const button = form.querySelector('button[type="submit"]');
+  button.disabled = !form.elements.expert.value || Boolean(item.assigned && !form.elements.reason.value.trim());
+}
+document.addEventListener('submit', event => {
+  const form = event.target.closest('[data-assignment]'); if (!form) return;
+  event.preventDefault();
+  const item = records.find(record => record.id === form.dataset.assignment);
+  try { replaceRecord(assignExpert(item, form.elements.expert.value, state.actor, form.elements.reason?.value || '')); persist(); render(); toast('Ответственный юрист назначен'); } catch(error) { toast(error.message); }
+});
+
 document.addEventListener('click', async event => {
-  const button = event.target.closest('button,[data-action]'); if (!button || button.disabled) return;
-  const item = currentItem();
+  const button = event.target.closest('button,[data-action],[data-scroll]'); if (!button || button.disabled) return;
+  if (button.dataset.item) state.actionItem = button.dataset.item;
+  const item = records.find(record => record.id === (button.dataset.item || (modal.contains(button) ? state.actionItem : null))) || currentItem();
+  if (button.dataset.scroll) { event.preventDefault(); document.getElementById(button.dataset.scroll)?.scrollIntoView({behavior:'smooth', block:'start'}); return; }
   if (button.dataset.tab) { state.tab = button.dataset.tab; render(); return; }
   if (button.dataset.open) { navigate(reviewUrl(records.find(i => i.id === button.dataset.open))); return; }
   if (button.dataset.group) { state.reviewGroup = button.dataset.group; state.errors = []; render(); return; }
   if (button.dataset.document) { documentPreview(item, button.dataset.document); return; }
-  if (button.dataset.editCriterion) { state.reviewGroup = questionGroups(item).find(g => g.questions.some(q => q.id === button.dataset.editCriterion)).id; navigate(reviewUrl(item, 'assessment')); return; }
+  if (button.dataset.editCriterion) { state.reviewGroup = questionGroups(item).find(g => g.questions.some(q => q.id === button.dataset.editCriterion)).id; state.resultView = 'edit'; navigate(reviewUrl(item, 'form')); requestAnimationFrame(() => document.querySelector(`[data-criterion="${button.dataset.editCriterion}"]`)?.scrollIntoView({block:'center'})); return; }
   if (button.dataset.template) {
     const group = questionGroups({ directions: Object.keys(DIRECTIONS), level: 3 }).find(g => g.id === button.dataset.template);
     modalShell(group.title, '<p>Пример критериев для согласования с правовым подразделением.</p>' + group.questions.map(q => `<div class="help-step"><strong>${q.title}</strong><p>${q.text}</p></div>`).join(''), '<button class="btn" data-action="close-modal">Закрыть</button>'); return;
@@ -240,21 +276,64 @@ document.addEventListener('click', async event => {
   }
   switch (button.dataset.action) {
     case 'menu': document.querySelector('#sidebar').classList.toggle('open'); break;
-    case 'home': navigate('#/registry'); break;
+    case 'home': state.version = 'current'; state.resultView = 'edit'; navigate('#/registry'); break;
     case 'templates': if (currentRoute().view === 'review') modalShell('О проверочных листах', '<p>Критерии помогают структурировать правовую оценку. Юрист выбирает применимые направления, проверяет документы и обосновывает замечания.</p><p>Предлагаемые вопросы требуют согласования с правовым подразделением. Их заполнение не заменяет профессиональную оценку юриста.</p>', '<button class="btn primary" data-action="close-modal">Понятно</button>'); else navigate('#/templates'); break;
     case 'close-modal': closeModal(); break;
     case 'reset-filters': Object.assign(state, { tab: 'all', search: '', level: 'all', assignee: 'all', today: false }); render(); break;
     case 'sample': openSample(); break;
     case 'confirm-sample': {
-      const name = document.querySelector('#sample-name').value.trim(); const bin = document.querySelector('#sample-bin').value.trim(); const eventNumber = document.querySelector('#sample-event').value.trim();
-      if (!name || !/^\d{12}$/.test(bin) || !eventNumber) { toast('Укажите наименование, БИН из 12 цифр и номер мероприятия'); return; }
-      const level = Number(document.querySelector('#sample-level').value); const next = structuredClone(seedData().find(r => r.level === level)); const num = Math.max(12, ...records.map(r => Number(r.id.split('-').at(-1)))) + 1; const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Oral' });
-      Object.assign(next, { id: `ЮЭ-2026-${String(num).padStart(4, '0')}`, name, bin, event: eventNumber, level, status: 'new', assigned: '', received: today, due: today, assessments: {}, result: { outcome: '', text: '', attachments: [] }, versions: [], iteration: 1, history: [] });
-      next.documents = next.documents.map(d => ({ ...d, number: d.number.replace(/30101-26-[^\s]+/, eventNumber), date: today, version: 1 }));
-      addHistory(next, 'Получен тестовый комплект', levelName(next), 'ВГА · демонстрация'); records.unshift(next); persist(); closeModal(); navigate(reviewUrl(next)); toast('Тестовый комплект добавлен'); break;
+      try {
+        const packet = newPacket(records, { name: document.querySelector('#sample-name').value, bin: document.querySelector('#sample-bin').value, event: document.querySelector('#sample-event').value, level: Number(document.querySelector('#sample-level').value) });
+        records.unshift(packet); persist(); closeModal(); navigate(objectUrl(objectFor(packet))); toast('Демонстрационный комплект получен из ВГА');
+      } catch (error) { toast(error.message); }
+      break;
     }
-    case 'assign': if (item?.status !== 'completed') openAssign(item); break;
-    case 'confirm-assign': { if (!item || item.status === 'completed') return; item.assigned = document.querySelector('#assign-person').value; if (item.status === 'new') item.status = 'work'; addHistory(item, 'Назначен исполнитель', item.assigned, 'Руководитель правового подразделения'); persist(); closeModal(); render(); toast('Исполнитель назначен'); break; }
+    case 'show-all': state.tab = 'all'; render(); break;
+    case 'conclusion-view': state.resultView = button.dataset.view === 'print' ? 'print' : 'edit'; state.printGeneratedAt = new Date().toISOString(); navigate(reviewUrl(item, button.dataset.view)); break;
+    case 'create-conclusion': {
+      try { const next = createConclusion(item, state.actor); replaceRecord(next); state.version = 'current'; state.resultView = 'edit'; persist(); navigate(reviewUrl(next)); } catch(error) { toast(error.message); }
+      break;
+    }
+    case 'receive-stage': {
+      const object = objectCases(records).find(object => object.id === button.dataset.object);
+      const level = Number(button.dataset.level);
+      state.receiveObject = object.id; state.receiveLevel = level;
+      modalShell('Тестовая передача из ВГА', `<p>${esc(object.name)}</p><p>Создать демонстрационный комплект для юридической экспертизы ${level}? Дополнительные проверочные листы юрист выбирает самостоятельно.</p>`, '<button class="btn" data-action="close-modal">Отмена</button><button class="btn primary" data-action="confirm-receive-stage">Получить тестовый комплект</button>');
+      break;
+    }
+    case 'confirm-receive-stage': {
+      try { const object = objectCases(records).find(object => object.id === state.receiveObject); const next = newPacket(records, {...object, level: state.receiveLevel}); records.push(next); persist(); closeModal(); render(); toast('Комплект добавлен к существующему объекту'); } catch(error) { toast(error.message); }
+      break;
+    }
+    case 'change-head':
+      if (item && state.actor === headOf(item) && !['completed','review'].includes(item.status)) modalShell('Заменить руководителя юридической экспертизы', `<div class="form-grid"><label class="field full">Новый руководитель<select class="select" id="next-head"><option value="">Выберите руководителя</option>${ACTORS.filter(actor => actor.name !== headOf(item)).map(actor => `<option value="${esc(actor.name)}">${esc(actor.name)}</option>`).join('')}</select></label><label class="field full">Причина замены <span class="required">*</span><textarea id="head-reason"></textarea></label></div>`, '<button class="btn" data-action="close-modal">Отмена</button><button class="btn primary" data-action="confirm-head">Заменить руководителя</button>');
+      break;
+    case 'confirm-head': {
+      if (!item || state.actor !== headOf(item) || ['completed','review'].includes(item.status)) break;
+      const head = document.querySelector('#next-head').value; const reason = document.querySelector('#head-reason').value.trim();
+      if (!ACTORS.some(actor => actor.name === head) || !reason) { toast('Выберите руководителя и укажите причину замены'); break; }
+      item.head = head; addHistory(item, 'Заменён руководитель юридической экспертизы', `${head}. Причина: ${reason}`, state.actor); persist(); closeModal(); render(); break;
+    }
+    case 'submit-review': {
+      try { replaceRecord(submitConclusion(item, state.actor)); persist(); render(); toast('Заключение направлено руководителю на рассмотрение'); } catch(error) { showErrors(error.message.split('\n')); }
+      break;
+    }
+    case 'review-return':
+      if (item?.status === 'review' && state.actor === headOf(item)) modalShell('Вернуть заключение юристу', '<label class="field">Замечания руководителя <span class="required">*</span><textarea id="review-comment" placeholder="Что требуется уточнить в заключении"></textarea></label>', '<button class="btn" data-action="close-modal">Отмена</button><button class="btn primary" data-action="confirm-review-return">Вернуть юристу</button>');
+      break;
+    case 'confirm-review-return': {
+      if (item?.status !== 'review' || state.actor !== headOf(item)) break;
+      const comment = document.querySelector('#review-comment').value.trim(); if (!comment) { toast('Заполните замечания руководителя'); break; }
+      item.status = 'work'; item.reviewComment = comment; addHistory(item, 'Заключение возвращено юристу', comment, state.actor); persist(); closeModal(); render(); break;
+    }
+    case 'object-history': {
+      const object = objectCases(records).find(object => object.id === button.dataset.object);
+      const history = Object.values(object.stages).flatMap(item => item.history.map(event => ({ ...event, detail: `Юридическая экспертиза ${item.level}. ${event.detail}` }))).sort((a,b) => b.time.localeCompare(a.time));
+      modalShell('История рассмотрения объекта', renderHistory({ history }), '<button class="btn" data-action="close-modal">Закрыть</button>'); break;
+    }
+    case 'document-history': modalShell('История заключения', renderHistory(item), '<button class="btn" data-action="close-modal">Закрыть</button>'); break;
+    case 'assign': if (item && state.actor === headOf(item) && ['new','work'].includes(item.status)) openAssign(item); break;
+    case 'confirm-assign': { if (!item || state.actor !== headOf(item)) return; try { replaceRecord(assignExpert(item, document.querySelector('#assign-person').value, state.actor)); } catch(error) { toast(error.message); break; } persist(); closeModal(); render(); toast('Исполнитель назначен'); break; }
     case 'directions': if (item && !isReadonly(item)) openDirections(item); break;
     case 'confirm-directions': { if (!item || isReadonly(item)) return; item.directions = [...document.querySelectorAll('input[name="direction"]:checked')].map(el => el.value); addHistory(item, 'Изменены направления проверки', item.directions.map(id => DIRECTIONS[id]).join(', ') || 'Общая правовая оценка'); state.reviewGroup = 'common'; persist(); closeModal(); render(); break; }
     case 'save': persist(true); break;
@@ -263,8 +342,8 @@ document.addEventListener('click', async event => {
     case 'confirm-return': { if (!item || isReadonly(item)) return; const errors = assessmentErrors(item); if (errors.length || !findings(item).length) { closeModal(); showErrors(errors); return; } const comment = document.querySelector('#return-comment').value.trim(); item.status = 'rework'; addHistory(item, 'Замечания переданы на доработку', comment || `Замечаний: ${findings(item).length}. Тестовая передача.`); persist(); closeModal(); render(); toast('Комплект переведён на доработку в макете'); break; }
     case 'resubmit': if (item?.status === 'rework') modalShell('Повторная передача документов', '<p>В макете будет создана новая передача комплекта. Предыдущие документы и замечания сохранятся в версиях, а правовая оценка новой передачи начнётся заново.</p><p>Это демонстрация получения исправлений от аудитора.</p>', '<button class="btn" data-action="close-modal">Отмена</button><button class="btn primary" data-action="confirm-resubmit">Получить исправленный комплект</button>'); break;
     case 'confirm-resubmit': { if (item?.status !== 'rework') return; records[records.findIndex(r => r.id === item.id)] = resubmit(item); state.reviewGroup = 'common'; persist(); closeModal(); render(); toast('Получена новая версия. Предыдущая оценка сохранена'); break; }
-    case 'complete': if (item && !isReadonly(item)) openComplete(item); break;
-    case 'confirm-complete': { if (!item || isReadonly(item)) return; try { records[records.findIndex(r => r.id === item.id)] = finishReview(item); persist(); closeModal(); render(); toast('Юридическая экспертиза завершена'); } catch (error) { closeModal(); showErrors(error.message.split('\n')); } break; }
+    case 'complete': if (item?.status === 'review' && state.actor === headOf(item)) openComplete(item); break;
+    case 'confirm-complete': { if (item?.status !== 'review' || state.actor !== headOf(item)) return; try { const next = finishReview(item); addHistory(next, 'Рассмотрение заключения завершено', 'Результат сохранён в макете; электронное подписание не выполнялось.', state.actor); replaceRecord(next); persist(); closeModal(); render(); toast('Юридическая экспертиза завершена'); } catch (error) { closeModal(); showErrors(error.message.split('\n')); } break; }
     case 'result-view': state.resultView = button.dataset.view; state.printGeneratedAt = new Date().toISOString(); state.errors = []; render(); break;
     case 'print-zoom': state.printZoom = Math.max(50, Math.min(125, state.printZoom + Number(button.dataset.step))); render(); break;
     case 'download-word':
@@ -273,12 +352,13 @@ document.addEventListener('click', async event => {
     case 'export-remarks': exportResult(item, true); break;
     case 'export-registry': { const quote = value => `"${String(value ?? '').replaceAll('"', '""')}"`; const lines = [['Номер экспертизы', 'Объект', 'БИН', 'Мероприятие', 'Уровень', 'Статус', 'Исполнитель', 'Срок'], ...records.filter(i => matches(i)).map(i => [i.id, i.name, i.bin, i.event, levelName(i), STATUS[i.status], i.assigned, date(i.due)])]; download('Реестр-юридических-экспертиз.csv', '\uFEFF' + lines.map(line => line.map(quote).join(';')).join('\r\n'), 'text/csv;charset=utf-8'); break; }
     case 'download-document': { const p = state.previewDocument; const doc = (p.versionItem || records.find(r => r.id === p.itemId)).documents.find(d => d.id === p.documentId); download(`${doc.title}-фрагмент.txt`, '\uFEFF' + document.querySelector('.doc-preview').innerText); break; }
-    case 'help': modalShell('Как работать с юридической экспертизой', '<div class="help-step"><strong>Получите комплект и назначьте исполнителя</strong><p>В реестре откройте новую экспертизу. В макете можно добавить тестовый комплект.</p></div><div class="help-step"><strong>Изучите документы и заполните правовую оценку</strong><p>Выберите направления проверки. По каждому критерию укажите ответ; замечания свяжите с документом и пунктом.</p></div><div class="help-step"><strong>При необходимости передайте замечания на доработку</strong><p>После тестового получения исправлений можно сравнить документы и прежнюю оценку в версиях.</p></div><div class="help-step"><strong>Оформите результат</strong><p>Заполните общий вывод и завершите экспертизу. Во вкладке «Электронная форма» можно посмотреть заключение, скачать его в Word или распечатать.</p></div><div class="info-note">' + icon('info') + 'Рабочий макет на демонстрационных данных. Подключение ВГА и подписание результата ещё не реализованы.</div>', '<button class="btn primary" data-action="close-modal">Понятно</button>'); break;
+    case 'help': modalShell('Как работать с юридической экспертизой', '<div class="help-step"><strong>Откройте объект и назначьте юриста</strong><p>Во вкладке «Все объекты» откройте объект. Руководитель назначает юриста отдельно на экспертизу 2 или 3. Затем юрист создаёт заключение. Для демонстрации роль переключается в шапке.</p></div><div class="help-step"><strong>Изучите документы и заполните правовую оценку</strong><p>Выберите направления проверки. По каждому критерию укажите ответ; замечания свяжите с документом и пунктом.</p></div><div class="help-step"><strong>При необходимости передайте замечания на доработку</strong><p>После тестового получения исправлений можно сравнить документы и прежнюю оценку в версиях.</p></div><div class="help-step"><strong>Оформите результат</strong><p>Заполните общий вывод и направьте заключение на рассмотрение руководителю. Руководитель может вернуть его юристу или завершить экспертизу. Во вкладке «Электронная форма» можно посмотреть заключение, скачать его в Word или распечатать.</p></div><div class="info-note">' + icon('info') + 'Рабочий макет на демонстрационных данных. Подключение ВГА и подписание результата ещё не реализованы.</div>', '<button class="btn primary" data-action="close-modal">Понятно</button>'); break;
   }
 });
 
 document.addEventListener('input', event => {
   const el = event.target;
+  if (el.closest('[data-assignment]')) { updateAssignment(el.closest('[data-assignment]')); return; }
   if (el.id === 'registry-search') { const start = el.selectionStart; state.search = el.value; renderRegistry(); const replacement = document.querySelector('#registry-search'); replacement.focus(); replacement.setSelectionRange(start, start); return; }
   const item = currentItem(); if (!item || isReadonly(item)) return;
   if (el.dataset.assess) { const a = item.assessments[el.dataset.assess] ||= { answer: 'pending' }; a[el.dataset.field] = el.value; }
@@ -287,6 +367,9 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('change', async event => {
   const el = event.target;
+  if (el.id === 'actor-select') { state.actor = el.value; state.errors = []; render(); return; }
+  if (el.id === 'conclusion-version') { state.version = el.value; state.errors = []; state.printGeneratedAt = new Date().toISOString(); render(); return; }
+  if (el.closest('[data-assignment]')) { updateAssignment(el.closest('[data-assignment]')); return; }
   if (el.id === 'level-filter') { state.level = el.value; render(); return; }
   if (el.id === 'assignee-filter') { state.assignee = el.value; render(); return; }
   if (el.id === 'due-filter') { state.today = el.checked; render(); return; }
@@ -307,7 +390,8 @@ document.addEventListener('change', async event => {
   }
 });
 modal.addEventListener('click', event => { if (event.target === modal) { const r = modal.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) closeModal(); } });
-window.addEventListener('hashchange', () => { state.errors = []; render(); window.scrollTo({ top: 0 }); });
+let lastReviewId = currentRoute().id;
+window.addEventListener('hashchange', () => { state.errors = []; state.resultView = 'edit'; if (currentRoute().id !== lastReviewId) state.version = 'current'; lastReviewId = currentRoute().id; render(); window.scrollTo({ top: 0 }); });
 window.addEventListener('pagehide', () => { if (saveTimeout) persist(); });
 render();
 

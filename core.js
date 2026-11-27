@@ -1,5 +1,5 @@
 export const STAFF = ['Ермекова Алия Сериковна', 'Садыков Данияр Маратович', 'Толеубаева Динара Муратовна'];
-export const STATUS = { new: 'Новая', work: 'В работе', rework: 'На доработке', completed: 'Завершена' };
+export const STATUS = { new: 'Новая', work: 'В работе', review: 'На рассмотрении', rework: 'На доработке', completed: 'Завершена' };
 export const ANSWERS = { yes: 'Соответствует', issue: 'Есть замечания', na: 'Не применимо', pending: 'Не проверено' };
 export const DIRECTIONS = { budget: 'Бюджетное законодательство', accounting: 'Бухгалтерский учёт' };
 export const OUTCOMES = { clear: 'Без замечаний', remarks: 'С замечаниями', revised: 'Замечания устранены' };
@@ -78,11 +78,11 @@ export function finishReview(item, now = new Date().toISOString()) {
 export function resubmit(item, now = new Date().toISOString()) {
   if (item.status !== 'rework') throw new Error('Повторная передача доступна для комплекта на доработке.');
   const next = structuredClone(item);
-  next.versions.unshift({ number: item.iteration, time: now, directions: structuredClone(item.directions), documents: structuredClone(item.documents), assessments: structuredClone(item.assessments), result: structuredClone(item.result) });
+  next.versions.unshift({ number: item.iteration, time: now, status: item.status, assigned: item.assigned, head: item.head, conclusionDate: item.conclusionDate, directions: structuredClone(item.directions), documents: structuredClone(item.documents), assessments: structuredClone(item.assessments), result: structuredClone(item.result) });
   next.iteration += 1;
   next.documents = next.documents.map(d => ({ ...d, version: d.version + 1, date: now.slice(0, 10) }));
   next.assessments = {}; next.result = { outcome: '', text: '', attachments: [] };
-  next.status = 'work';
+  next.status = 'work'; next.conclusionCreated = true;
   next.history.unshift({ time: now, action: 'Получен исправленный комплект', detail: `Повторная проверка · передача ${next.iteration}`, author: 'Аудитор · демонстрация' });
   return next;
 }
